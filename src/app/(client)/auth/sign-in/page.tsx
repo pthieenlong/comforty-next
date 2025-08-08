@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   EyeIcon,
   EyeSlashIcon,
@@ -12,14 +13,47 @@ import {
 
 export default function SignInPage() {
   const router = useRouter();
+  const { login, isLoading, error, clearError, isAuthenticated } = useAuth();
+
   const [formData, setFormData] = useState({
-    email: "",
+    username: "",
     password: "",
     rememberMe: false,
   });
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [formErrors, setFormErrors] = useState({
+    username: "",
+    password: "",
+  });
+
+  // Redirect nếu đã đăng nhập
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.push("/");
+    }
+  }, [isAuthenticated, router]);
+
+  // Validate form đơn giản cho đăng nhập
+  const validateForm = () => {
+    const errors = { username: "", password: "" };
+    let isValid = true;
+
+    if (!formData.username.trim()) {
+      errors.username = "Vui lòng nhập tên đăng nhập";
+      isValid = false;
+    }
+
+    if (!formData.password) {
+      errors.password = "Vui lòng nhập mật khẩu";
+      isValid = false;
+    } else if (formData.password.length < 6) {
+      errors.password = "Mật khẩu phải có ít nhất 6 ký tự";
+      isValid = false;
+    }
+
+    setFormErrors(errors);
+    return isValid;
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
@@ -27,38 +61,38 @@ export default function SignInPage() {
       ...prev,
       [name]: type === "checkbox" ? checked : value,
     }));
+
+    // Clear errors khi user bắt đầu nhập
+    if (formErrors[name as keyof typeof formErrors]) {
+      setFormErrors((prev) => ({
+        ...prev,
+        [name]: "",
+      }));
+    }
+
+    if (error) {
+      clearError();
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setError("");
+
+    // Validate form
+    if (!validateForm()) {
+      return;
+    }
 
     try {
-      // TODO: Implement actual authentication
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await login({
+        username: formData.username,
+        password: formData.password,
+      });
 
-      // Mock authentication
-      if (
-        formData.email === "demo@example.com" &&
-        formData.password === "password"
-      ) {
-        localStorage.setItem(
-          "user",
-          JSON.stringify({
-            email: formData.email,
-            name: "Demo User",
-            token: "mock-jwt-token",
-          })
-        );
-        router.push("/");
-      } else {
-        throw new Error("Thông tin đăng nhập không chính xác");
-      }
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Không thể đăng nhập");
-    } finally {
-      setLoading(false);
+      // Redirect sẽ được xử lý bởi useEffect
+    } catch (err) {
+      // Error đã được xử lý trong AuthContext
+      console.error("Login error:", err);
     }
   };
 
@@ -91,27 +125,34 @@ export default function SignInPage() {
           )}
 
           <div className="space-y-4">
-            {/* Email */}
+            {/* Username */}
             <div>
-              <label htmlFor="email" className="sr-only">
-                Địa chỉ email
+              <label htmlFor="username" className="sr-only">
+                Tên đăng nhập
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <UserIcon className="h-5 w-5 text-gray-400" />
                 </div>
                 <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
+                  id="username"
+                  name="username"
+                  type="text"
+                  autoComplete="username"
                   required
-                  value={formData.email}
+                  value={formData.username}
                   onChange={handleChange}
-                  className="appearance-none relative block w-full pl-10 pr-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                  placeholder="Địa chỉ email"
+                  className={`appearance-none relative block w-full pl-10 pr-3 py-3 border placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm ${
+                    formErrors.username ? "border-red-300" : "border-gray-300"
+                  }`}
+                  placeholder="Tên đăng nhập"
                 />
               </div>
+              {formErrors.username && (
+                <p className="mt-1 text-sm text-red-600">
+                  {formErrors.username}
+                </p>
+              )}
             </div>
 
             {/* Password */}
@@ -131,7 +172,9 @@ export default function SignInPage() {
                   required
                   value={formData.password}
                   onChange={handleChange}
-                  className="appearance-none relative block w-full pl-10 pr-10 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+                  className={`appearance-none relative block w-full pl-10 pr-10 py-3 border placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm ${
+                    formErrors.password ? "border-red-300" : "border-gray-300"
+                  }`}
                   placeholder="Mật khẩu"
                 />
                 <button
@@ -146,6 +189,11 @@ export default function SignInPage() {
                   )}
                 </button>
               </div>
+              {formErrors.password && (
+                <p className="mt-1 text-sm text-red-600">
+                  {formErrors.password}
+                </p>
+              )}
             </div>
           </div>
 
@@ -163,7 +211,7 @@ export default function SignInPage() {
                 htmlFor="remember-me"
                 className="ml-2 block text-sm text-gray-900"
               >
-                Ghi nhớ tôi
+                Lưu đăng nhập
               </label>
             </div>
 
@@ -180,10 +228,17 @@ export default function SignInPage() {
           <div>
             <button
               type="submit"
-              disabled={loading}
+              disabled={isLoading}
               className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? "Đang đăng nhập..." : "Đăng nhập"}
+              {isLoading ? (
+                <div className="flex items-center">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Đang đăng nhập...
+                </div>
+              ) : (
+                "Đăng nhập"
+              )}
             </button>
           </div>
 

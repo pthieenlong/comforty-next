@@ -1,35 +1,160 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import api from "@/lib/axios";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   EyeIcon,
   EyeSlashIcon,
   UserIcon,
   LockClosedIcon,
   EnvelopeIcon,
-  PhoneIcon,
 } from "@heroicons/react/24/outline";
+import {
+  validatePassword,
+  PasswordValidation,
+} from "@/utils/passwordValidation";
 
 export default function SignUpPage() {
   const router = useRouter();
+  const { register, isLoading, error, clearError, isAuthenticated } = useAuth();
+
   const [formData, setFormData] = useState({
-    firstName: "",
-    lastName: "",
     username: "",
     email: "",
-    phone: "",
     password: "",
     confirmPassword: "",
     agreeToTerms: false,
-    subscribeNewsletter: true,
   });
+
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Separate errors for each field
+  const [formErrors, setFormErrors] = useState({
+    username: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+    terms: "",
+  });
+
+  const [passwordValidation, setPasswordValidation] =
+    useState<PasswordValidation>({
+      isValid: false,
+      errors: [],
+      strength: "weak",
+    });
+  const [showPasswordHints, setShowPasswordHints] = useState(false);
+
+  // Redirect nếu đã đăng nhập
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.push("/");
+    }
+  }, [isAuthenticated, router]);
+
+  // Validate password khi thay đổi
+  useEffect(() => {
+    if (formData.password) {
+      const validation = validatePassword(formData.password);
+      setPasswordValidation(validation);
+
+      // Clear password error if password becomes valid
+      if (validation.isValid && formErrors.password) {
+        setFormErrors((prev) => ({ ...prev, password: "" }));
+      }
+    } else {
+      setPasswordValidation({
+        isValid: false,
+        errors: [],
+        strength: "weak",
+      });
+    }
+  }, [formData.password, formErrors.password]);
+
+  // Validate confirm password
+  useEffect(() => {
+    if (
+      formData.confirmPassword &&
+      formData.password !== formData.confirmPassword
+    ) {
+      setFormErrors((prev) => ({
+        ...prev,
+        confirmPassword: "Mật khẩu xác nhận không khớp",
+      }));
+    } else if (
+      formData.confirmPassword &&
+      formData.password === formData.confirmPassword
+    ) {
+      setFormErrors((prev) => ({ ...prev, confirmPassword: "" }));
+    }
+  }, [formData.password, formData.confirmPassword]);
+
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const validateForm = () => {
+    const errors = {
+      username: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
+      terms: "",
+    };
+    let isValid = true;
+
+    // Username validation
+    if (!formData.username.trim()) {
+      errors.username = "Vui lòng nhập tên đăng nhập";
+      isValid = false;
+    } else if (formData.username.length < 3) {
+      errors.username = "Tên đăng nhập phải có ít nhất 3 ký tự";
+      isValid = false;
+    } else if (!/^[a-zA-Z0-9_]+$/.test(formData.username)) {
+      errors.username = "Tên đăng nhập chỉ được chứa chữ, số và dấu gạch dưới";
+      isValid = false;
+    }
+
+    // Email validation
+    if (!formData.email.trim()) {
+      errors.email = "Vui lòng nhập địa chỉ email";
+      isValid = false;
+    } else if (!validateEmail(formData.email)) {
+      errors.email = "Địa chỉ email không hợp lệ";
+      isValid = false;
+    }
+
+    // Password validation
+    if (!formData.password) {
+      errors.password = "Vui lòng nhập mật khẩu";
+      isValid = false;
+    } else if (!passwordValidation.isValid) {
+      errors.password = "Mật khẩu không đáp ứng yêu cầu bảo mật";
+      isValid = false;
+    }
+
+    // Confirm password validation
+    if (!formData.confirmPassword) {
+      errors.confirmPassword = "Vui lòng xác nhận mật khẩu";
+      isValid = false;
+    } else if (formData.password !== formData.confirmPassword) {
+      errors.confirmPassword = "Mật khẩu xác nhận không khớp";
+      isValid = false;
+    }
+
+    // Terms validation
+    if (!formData.agreeToTerms) {
+      errors.terms = "Vui lòng đồng ý với điều khoản sử dụng";
+      isValid = false;
+    }
+
+    setFormErrors(errors);
+    return isValid;
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
@@ -37,116 +162,69 @@ export default function SignUpPage() {
       ...prev,
       [name]: type === "checkbox" ? checked : value,
     }));
-    // Clear error when user starts typing
-    if (errors[name]) {
-      setErrors((prev) => ({ ...prev, [name]: "" }));
-    }
-  };
 
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {};
-
-    if (!formData.firstName.trim()) {
-      newErrors.firstName = "Họ là bắt buộc";
-    }
-    if (!formData.lastName.trim()) {
-      newErrors.lastName = "Tên là bắt buộc";
-    }
-    if (!formData.username.trim()) {
-      newErrors.username = "Tên đăng nhập là bắt buộc";
-    } else if (formData.username.length < 3) {
-      newErrors.username = "Tên đăng nhập phải có ít nhất 3 ký tự";
-    } else if (!/^[a-zA-Z0-9_]+$/.test(formData.username)) {
-      newErrors.username =
-        "Tên đăng nhập chỉ được chứa chữ cái, số và dấu gạch dưới";
-    }
-    if (!formData.email.trim()) {
-      newErrors.email = "Email là bắt buộc";
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = "Email không hợp lệ";
-    }
-    if (!formData.phone.trim()) {
-      newErrors.phone = "Số điện thoại là bắt buộc";
-    }
-    if (!formData.password) {
-      newErrors.password = "Mật khẩu là bắt buộc";
-    } else if (formData.password.length < 6) {
-      newErrors.password = "Mật khẩu phải có ít nhất 6 ký tự";
-    }
-    if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = "Mật khẩu không khớp";
-    }
-    if (!formData.agreeToTerms) {
-      newErrors.agreeToTerms = "Bạn phải đồng ý với điều khoản và điều kiện";
+    // Clear specific field error when user starts typing
+    if (formErrors[name as keyof typeof formErrors]) {
+      setFormErrors((prev) => ({
+        ...prev,
+        [name]: "",
+      }));
     }
 
-    return newErrors;
+    // Clear global error from AuthContext
+    if (error) {
+      clearError();
+    }
+
+    // Special handling for terms checkbox
+    if (name === "agreeToTerms" && checked) {
+      setFormErrors((prev) => ({ ...prev, terms: "" }));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newErrors = validateForm();
 
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
+    // Validate form
+    if (!validateForm()) {
       return;
     }
 
-    setLoading(true);
-    setErrors({});
-
     try {
-      // Tạo fullname từ firstName và lastName
-      const fullName = `${formData.firstName.trim()} ${formData.lastName.trim()}`;
-
-      // Chuẩn bị dữ liệu gửi đến API
-      const registerData = {
+      // Call register API
+      await register({
         username: formData.username.trim(),
         email: formData.email.trim(),
         password: formData.password,
-        fullName: fullName,
-        phone: formData.phone.trim(),
-      };
+        confirmPassword: formData.confirmPassword,
+      });
 
-      // Gửi request đến API
-      const response = await api.post("/auth/register", registerData);
-
-      if (response.data.success) {
-        alert("Tài khoản đã được tạo thành công! Vui lòng đăng nhập.");
-        router.push("/auth/sign-in");
-      } else {
-        throw new Error(response.data.message || "Đăng ký thất bại");
-      }
+      // Show success message and redirect
+      alert("Đăng ký thành công! Vui lòng đăng nhập.");
+      router.push("/auth/sign-in");
     } catch (err: any) {
-      let errorMessage = "Không thể tạo tài khoản";
+      // Error handling
+      console.error("Registration error:", err);
 
-      if (err.response?.data?.message) {
-        errorMessage = err.response.data.message;
-      } else if (err.message) {
-        errorMessage = err.message;
-      }
-
-      // Xử lý lỗi cụ thể từ API
+      // Handle specific field errors from API
       if (err.response?.data?.errors) {
         const apiErrors = err.response.data.errors;
-        const newErrors: Record<string, string> = {};
+        const newErrors = { ...formErrors };
 
-        Object.keys(apiErrors).forEach((key) => {
-          if (key === "username") newErrors.username = apiErrors[key];
-          if (key === "email") newErrors.email = apiErrors[key];
-          if (key === "phone") newErrors.phone = apiErrors[key];
-        });
-
-        if (Object.keys(newErrors).length > 0) {
-          setErrors(newErrors);
-        } else {
-          setErrors({ general: errorMessage });
+        // Map API errors to form fields
+        if (apiErrors.username) {
+          newErrors.username = apiErrors.username;
         }
-      } else {
-        setErrors({ general: errorMessage });
+        if (apiErrors.email) {
+          newErrors.email = apiErrors.email;
+        }
+        if (apiErrors.password) {
+          newErrors.password = apiErrors.password;
+        }
+
+        setFormErrors(newErrors);
       }
-    } finally {
-      setLoading(false);
+      // Global error will be handled by AuthContext and displayed via error prop
     }
   };
 
@@ -158,7 +236,7 @@ export default function SignUpPage() {
             <span className="text-white font-bold text-xl">C</span>
           </div>
           <h2 className="mt-6 text-center text-3xl font-bold text-gray-900">
-            Tạo tài khoản của bạn
+            Tạo tài khoản mới
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
             Hoặc{" "}
@@ -166,173 +244,86 @@ export default function SignUpPage() {
               href="/auth/sign-in"
               className="font-medium text-blue-600 hover:text-blue-500"
             >
-              đăng nhập vào tài khoản hiện có
+              đăng nhập vào tài khoản có sẵn
             </Link>
           </p>
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          {errors.general && (
+          {/* Global error from AuthContext */}
+          {error && (
             <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
-              {errors.general}
+              {error}
             </div>
           )}
 
           <div className="space-y-4">
-            {/* Name Fields */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="firstName" className="sr-only">
-                  Họ
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <UserIcon className="h-5 w-5 text-gray-400" />
-                  </div>
-                  <input
-                    id="firstName"
-                    name="firstName"
-                    type="text"
-                    required
-                    value={formData.firstName}
-                    onChange={handleChange}
-                    className={`appearance-none relative block w-full pl-10 pr-3 py-3 border placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm ${
-                      errors.firstName ? "border-red-300" : "border-gray-300"
-                    }`}
-                    placeholder="Họ"
-                  />
-                </div>
-                {errors.firstName && (
-                  <p className="mt-1 text-sm text-red-600">
-                    {errors.firstName}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label htmlFor="lastName" className="sr-only">
-                  Tên
-                </label>
-                <input
-                  id="lastName"
-                  name="lastName"
-                  type="text"
-                  required
-                  value={formData.lastName}
-                  onChange={handleChange}
-                  className={`appearance-none relative block w-full px-3 py-3 border placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm ${
-                    errors.lastName ? "border-red-300" : "border-gray-300"
-                  }`}
-                  placeholder="Tên"
-                />
-                {errors.lastName && (
-                  <p className="mt-1 text-sm text-red-600">{errors.lastName}</p>
-                )}
-              </div>
-            </div>
-
             {/* Username */}
             <div>
-              <label htmlFor="username" className="sr-only">
-                Tên đăng nhập
-              </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <UserIcon className="h-5 w-5 text-gray-400" />
                 </div>
                 <input
-                  id="username"
                   name="username"
                   type="text"
-                  autoComplete="username"
                   required
                   value={formData.username}
                   onChange={handleChange}
-                  className={`appearance-none relative block w-full pl-10 pr-3 py-3 border placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm ${
-                    errors.username ? "border-red-300" : "border-gray-300"
+                  className={`appearance-none relative block w-full pl-10 pr-3 py-3 border placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${
+                    formErrors.username ? "border-red-300" : "border-gray-300"
                   }`}
                   placeholder="Tên đăng nhập"
                 />
               </div>
-              {errors.username && (
-                <p className="mt-1 text-sm text-red-600">{errors.username}</p>
+              {formErrors.username && (
+                <p className="mt-1 text-sm text-red-600">
+                  {formErrors.username}
+                </p>
               )}
             </div>
 
             {/* Email */}
             <div>
-              <label htmlFor="email" className="sr-only">
-                Địa chỉ email
-              </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <EnvelopeIcon className="h-5 w-5 text-gray-400" />
                 </div>
                 <input
-                  id="email"
                   name="email"
                   type="email"
-                  autoComplete="email"
                   required
                   value={formData.email}
                   onChange={handleChange}
-                  className={`appearance-none relative block w-full pl-10 pr-3 py-3 border placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm ${
-                    errors.email ? "border-red-300" : "border-gray-300"
+                  className={`appearance-none relative block w-full pl-10 pr-3 py-3 border placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${
+                    formErrors.email ? "border-red-300" : "border-gray-300"
                   }`}
                   placeholder="Địa chỉ email"
                 />
               </div>
-              {errors.email && (
-                <p className="mt-1 text-sm text-red-600">{errors.email}</p>
+              {formErrors.email && (
+                <p className="mt-1 text-sm text-red-600">{formErrors.email}</p>
               )}
             </div>
 
-            {/* Phone */}
+            {/* Password với validation */}
             <div>
-              <label htmlFor="phone" className="sr-only">
-                Số điện thoại
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <PhoneIcon className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  id="phone"
-                  name="phone"
-                  type="tel"
-                  required
-                  value={formData.phone}
-                  onChange={handleChange}
-                  className={`appearance-none relative block w-full pl-10 pr-3 py-3 border placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm ${
-                    errors.phone ? "border-red-300" : "border-gray-300"
-                  }`}
-                  placeholder="Số điện thoại"
-                />
-              </div>
-              {errors.phone && (
-                <p className="mt-1 text-sm text-red-600">{errors.phone}</p>
-              )}
-            </div>
-
-            {/* Password */}
-            <div>
-              <label htmlFor="password" className="sr-only">
-                Mật khẩu
-              </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <LockClosedIcon className="h-5 w-5 text-gray-400" />
                 </div>
                 <input
-                  id="password"
                   name="password"
                   type={showPassword ? "text" : "password"}
-                  autoComplete="new-password"
                   required
                   value={formData.password}
                   onChange={handleChange}
-                  className={`appearance-none relative block w-full pl-10 pr-10 py-3 border placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm ${
-                    errors.password ? "border-red-300" : "border-gray-300"
+                  onFocus={() => setShowPasswordHints(true)}
+                  className={`appearance-none relative block w-full pl-10 pr-10 py-3 border placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${
+                    formErrors.password ||
+                    (formData.password && !passwordValidation.isValid)
+                      ? "border-red-300"
+                      : "border-gray-300"
                   }`}
                   placeholder="Mật khẩu"
                 />
@@ -348,30 +339,81 @@ export default function SignUpPage() {
                   )}
                 </button>
               </div>
-              {errors.password && (
-                <p className="mt-1 text-sm text-red-600">{errors.password}</p>
+
+              {formErrors.password && (
+                <p className="mt-1 text-sm text-red-600">
+                  {formErrors.password}
+                </p>
               )}
+
+              {/* Password Strength Indicator */}
+              {formData.password && (
+                <div className="mt-2">
+                  <div className="flex items-center space-x-2">
+                    <div className="flex-1 bg-gray-200 rounded-full h-2">
+                      <div
+                        className={`h-2 rounded-full transition-all duration-300 ${
+                          passwordValidation.strength === "weak"
+                            ? "bg-red-500 w-1/3"
+                            : passwordValidation.strength === "medium"
+                            ? "bg-yellow-500 w-2/3"
+                            : "bg-green-500 w-full"
+                        }`}
+                      />
+                    </div>
+                    <span
+                      className={`text-sm font-medium ${
+                        passwordValidation.strength === "weak"
+                          ? "text-red-500"
+                          : passwordValidation.strength === "medium"
+                          ? "text-yellow-500"
+                          : "text-green-500"
+                      }`}
+                    >
+                      {passwordValidation.strength === "weak"
+                        ? "Yếu"
+                        : passwordValidation.strength === "medium"
+                        ? "Trung bình"
+                        : "Mạnh"}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Password Requirements */}
+              {showPasswordHints &&
+                formData.password &&
+                !passwordValidation.isValid && (
+                  <div className="mt-2 p-3 bg-red-50 rounded-lg">
+                    <p className="text-sm font-medium text-red-800 mb-2">
+                      Mật khẩu cần đáp ứng các yêu cầu sau:
+                    </p>
+                    <ul className="text-sm text-red-700 space-y-1">
+                      {passwordValidation.errors.map((error, index) => (
+                        <li key={index} className="flex items-center">
+                          <span className="w-2 h-2 bg-red-400 rounded-full mr-2"></span>
+                          {error}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
             </div>
 
             {/* Confirm Password */}
             <div>
-              <label htmlFor="confirmPassword" className="sr-only">
-                Xác nhận mật khẩu
-              </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <LockClosedIcon className="h-5 w-5 text-gray-400" />
                 </div>
                 <input
-                  id="confirmPassword"
                   name="confirmPassword"
                   type={showConfirmPassword ? "text" : "password"}
-                  autoComplete="new-password"
                   required
                   value={formData.confirmPassword}
                   onChange={handleChange}
-                  className={`appearance-none relative block w-full pl-10 pr-10 py-3 border placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm ${
-                    errors.confirmPassword
+                  className={`appearance-none relative block w-full pl-10 pr-10 py-3 border placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${
+                    formErrors.confirmPassword
                       ? "border-red-300"
                       : "border-gray-300"
                   }`}
@@ -389,74 +431,68 @@ export default function SignUpPage() {
                   )}
                 </button>
               </div>
-              {errors.confirmPassword && (
+              {formErrors.confirmPassword && (
                 <p className="mt-1 text-sm text-red-600">
-                  {errors.confirmPassword}
+                  {formErrors.confirmPassword}
                 </p>
               )}
             </div>
           </div>
 
-          {/* Terms and Newsletter */}
-          <div className="space-y-4">
+          {/* Terms Agreement */}
+          <div>
             <div className="flex items-start">
               <input
-                id="agreeToTerms"
+                id="agree-terms"
                 name="agreeToTerms"
                 type="checkbox"
                 checked={formData.agreeToTerms}
                 onChange={handleChange}
-                className={`h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mt-1 ${
-                  errors.agreeToTerms ? "border-red-300" : ""
-                }`}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mt-1"
               />
               <label
-                htmlFor="agreeToTerms"
+                htmlFor="agree-terms"
                 className="ml-2 block text-sm text-gray-900"
               >
                 Tôi đồng ý với{" "}
-                <Link href="/terms" className="text-blue-600 hover:underline">
-                  Điều khoản và Điều kiện
+                <Link
+                  href="/terms"
+                  className="text-blue-600 hover:text-blue-500"
+                >
+                  điều khoản sử dụng
                 </Link>{" "}
                 và{" "}
-                <Link href="/privacy" className="text-blue-600 hover:underline">
-                  Chính sách Bảo mật
+                <Link
+                  href="/privacy"
+                  className="text-blue-600 hover:text-blue-500"
+                >
+                  chính sách bảo mật
                 </Link>
               </label>
             </div>
-            {errors.agreeToTerms && (
-              <p className="text-sm text-red-600">{errors.agreeToTerms}</p>
+            {formErrors.terms && (
+              <p className="mt-1 text-sm text-red-600">{formErrors.terms}</p>
             )}
-
-            <div className="flex items-center">
-              <input
-                id="subscribeNewsletter"
-                name="subscribeNewsletter"
-                type="checkbox"
-                checked={formData.subscribeNewsletter}
-                onChange={handleChange}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-              />
-              <label
-                htmlFor="subscribeNewsletter"
-                className="ml-2 block text-sm text-gray-900"
-              >
-                Đăng ký nhận bản tin để nhận cập nhật và ưu đãi
-              </label>
-            </div>
           </div>
 
           <div>
             <button
               type="submit"
-              disabled={loading}
+              disabled={isLoading}
               className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? "Đang tạo tài khoản..." : "Tạo tài khoản"}
+              {isLoading ? (
+                <div className="flex items-center">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Đang tạo tài khoản...
+                </div>
+              ) : (
+                "Tạo tài khoản"
+              )}
             </button>
           </div>
 
-          {/* Social Registration */}
+          {/* Social Sign Up */}
           <div className="mt-6">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">

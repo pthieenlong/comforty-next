@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/common/hooks/useCart";
+import { useAuth } from "@/contexts/AuthContext";
 
 import {
   MagnifyingGlassIcon,
@@ -16,38 +17,18 @@ import {
   ArrowRightOnRectangleIcon,
   UserCircleIcon,
   Cog6ToothIcon,
+  CogIcon,
 } from "@heroicons/react/24/outline";
 
 export default function Header() {
   const router = useRouter();
-  const { itemsCount } = useCart(); // Add cart hook
+  const { itemsCount } = useCart();
+  const { user, isAuthenticated, logout, isAdmin } = useAuth();
+
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [user, setUser] = useState<{ name: string; email: string } | null>(
-    null
-  );
   const userMenuRef = useRef<HTMLDivElement>(null);
-
-  // Kiểm tra trạng thái đăng nhập
-  useEffect(() => {
-    const checkLoginStatus = () => {
-      const userData = localStorage.getItem("user");
-      if (userData) {
-        try {
-          const parsedUser = JSON.parse(userData);
-          setIsLoggedIn(true);
-          setUser(parsedUser);
-        } catch (error) {
-          console.error("Error parsing user data:", error);
-          localStorage.removeItem("user");
-        }
-      }
-    };
-
-    checkLoginStatus();
-  }, []);
 
   // Đóng dropdown khi click bên ngoài
   useEffect(() => {
@@ -66,10 +47,8 @@ export default function Header() {
     };
   }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem("user");
-    setIsLoggedIn(false);
-    setUser(null);
+  const handleLogout = async () => {
+    await logout();
     setIsUserMenuOpen(false);
     router.push("/");
   };
@@ -92,6 +71,16 @@ export default function Header() {
               Miễn phí vận chuyển cho đơn hàng trên 2.000.000đ
             </div>
             <div className="flex items-center space-x-4">
+              {/* Admin Link - chỉ hiện khi user có role ADMIN */}
+              {isAdmin() && (
+                <Link
+                  href="/admin"
+                  className="text-blue-600 hover:text-blue-800 font-medium flex items-center"
+                >
+                  <CogIcon className="h-4 w-4 mr-1" />
+                  Quản trị
+                </Link>
+              )}
               <Link
                 href="/account"
                 className="text-gray-600 hover:text-gray-900"
@@ -184,7 +173,7 @@ export default function Header() {
               {/* Dropdown Menu */}
               {isUserMenuOpen && (
                 <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
-                  {!isLoggedIn ? (
+                  {!isAuthenticated ? (
                     // Menu khi chưa đăng nhập
                     <>
                       <div className="px-4 py-3 border-b border-gray-100">
@@ -229,11 +218,32 @@ export default function Header() {
                     <>
                       <div className="px-4 py-3 border-b border-gray-100">
                         <p className="text-sm font-medium text-gray-900">
-                          {user?.name || "Người dùng"}
+                          {user?.username || "Người dùng"}
                         </p>
-                        <p className="text-sm text-gray-600">{user?.email}</p>
+                        <div className="flex items-center mt-1">
+                          {user?.roles?.map((role) => (
+                            <span
+                              key={role}
+                              className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 mr-1"
+                            >
+                              {role}
+                            </span>
+                          ))}
+                        </div>
                       </div>
                       <div className="py-2">
+                        {/* Admin Panel Link */}
+                        {isAdmin() && (
+                          <Link
+                            href="/admin"
+                            className="flex items-center px-4 py-2 text-sm text-blue-600 hover:bg-blue-50"
+                            onClick={() => setIsUserMenuOpen(false)}
+                          >
+                            <CogIcon className="h-5 w-5 mr-3 text-blue-500" />
+                            Quản trị hệ thống
+                          </Link>
+                        )}
+
                         <Link
                           href="/account"
                           className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
