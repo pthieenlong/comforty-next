@@ -199,9 +199,8 @@ export default function SignUpPage() {
         confirmPassword: formData.confirmPassword,
       });
 
-      // Show success message and redirect
-      alert("Đăng ký thành công! Vui lòng đăng nhập.");
-      router.push("/auth/sign-in");
+      // Đơn giản chỉ redirect - không cần lưu state gì
+      router.push("/auth/verify-email");
     } catch (err: any) {
       // Error handling
       console.error("Registration error:", err);

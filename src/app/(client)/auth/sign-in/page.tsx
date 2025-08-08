@@ -10,7 +10,7 @@ import {
   UserIcon,
   LockClosedIcon,
 } from "@heroicons/react/24/outline";
-
+import EmailVerificationBanner from "@/components/auth/EmailVerificationBanner";
 export default function SignInPage() {
   const router = useRouter();
   const { login, isLoading, error, clearError, isAuthenticated } = useAuth();
@@ -118,6 +118,9 @@ export default function SignInPage() {
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          {/* Email Verification Banner */}
+          <EmailVerificationBanner />
+
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
               {error}

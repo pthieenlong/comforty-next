@@ -12,6 +12,8 @@ import {
   LoginRequest,
   LoginResponse,
   RegisterRequest,
+  VerifyEmailRequest,
+  ResendVerificationRequest,
 } from "@/services/authService";
 
 interface AuthState {
@@ -28,6 +30,12 @@ type AuthAction =
   | { type: "REGISTER_START" }
   | { type: "REGISTER_SUCCESS" }
   | { type: "REGISTER_FAILURE"; payload: string }
+  | { type: "VERIFY_EMAIL_START" }
+  | { type: "VERIFY_EMAIL_SUCCESS" }
+  | { type: "VERIFY_EMAIL_FAILURE"; payload: string }
+  | { type: "RESEND_VERIFICATION_START" }
+  | { type: "RESEND_VERIFICATION_SUCCESS" }
+  | { type: "RESEND_VERIFICATION_FAILURE"; payload: string }
   | { type: "LOGOUT" }
   | { type: "SET_LOADING"; payload: boolean }
   | { type: "CLEAR_ERROR" };
@@ -43,6 +51,8 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
   switch (action.type) {
     case "LOGIN_START":
     case "REGISTER_START":
+    case "VERIFY_EMAIL_START":
+    case "RESEND_VERIFICATION_START":
       return {
         ...state,
         isLoading: true,
@@ -57,6 +67,8 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
         error: null,
       };
     case "REGISTER_SUCCESS":
+    case "VERIFY_EMAIL_SUCCESS":
+    case "RESEND_VERIFICATION_SUCCESS":
       return {
         ...state,
         isLoading: false,
@@ -64,6 +76,8 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
       };
     case "LOGIN_FAILURE":
     case "REGISTER_FAILURE":
+    case "VERIFY_EMAIL_FAILURE":
+    case "RESEND_VERIFICATION_FAILURE":
       return {
         ...state,
         user: null,
@@ -96,6 +110,8 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
 interface AuthContextType extends AuthState {
   login: (credentials: LoginRequest) => Promise<void>;
   register: (userData: RegisterRequest) => Promise<void>;
+  verifyEmail: (token: string) => Promise<void>;
+  resendVerification: (email: string) => Promise<void>;
   logout: () => Promise<void>;
   clearError: () => void;
   hasRole: (role: string) => boolean;
@@ -116,7 +132,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const userData = localStorage.getItem("user");
         if (userData) {
           const user = JSON.parse(userData);
-          // Verify với server nếu cần
           dispatch({ type: "LOGIN_SUCCESS", payload: user });
         }
       } catch (error) {
@@ -136,12 +151,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const response = await authService.login(credentials);
 
-      if (response.success) {
+      if (response.success && response.data) {
         const userData = response.data;
-
-        // Lưu user data vào localStorage
         localStorage.setItem("user", JSON.stringify(userData));
-
         dispatch({ type: "LOGIN_SUCCESS", payload: userData });
       } else {
         throw new Error(response.message || "Đăng nhập thất bại");
@@ -162,7 +174,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (response.success) {
         dispatch({ type: "REGISTER_SUCCESS" });
-        // Không tự động đăng nhập, để user tự đăng nhập
       } else {
         throw new Error(response.message || "Đăng ký thất bại");
       }
@@ -170,6 +181,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const errorMessage =
         error.response?.data?.message || error.message || "Đăng ký thất bại";
       dispatch({ type: "REGISTER_FAILURE", payload: errorMessage });
+      throw error;
+    }
+  };
+
+  const verifyEmail = async (token: string) => {
+    dispatch({ type: "VERIFY_EMAIL_START" });
+
+    try {
+      const response = await authService.verifyEmail({ token });
+
+      if (response.success) {
+        dispatch({ type: "VERIFY_EMAIL_SUCCESS" });
+      } else {
+        throw new Error(response.message || "Xác thực email thất bại");
+      }
+    } catch (error: any) {
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "Xác thực email thất bại";
+      dispatch({ type: "VERIFY_EMAIL_FAILURE", payload: errorMessage });
+      throw error;
+    }
+  };
+
+  const resendVerification = async (email: string) => {
+    dispatch({ type: "RESEND_VERIFICATION_START" });
+
+    try {
+      const response = await authService.resendVerification({ email });
+
+      if (response.success) {
+        dispatch({ type: "RESEND_VERIFICATION_SUCCESS" });
+      } else {
+        throw new Error(response.message || "Gửi lại email thất bại");
+      }
+    } catch (error: any) {
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "Gửi lại email thất bại";
+      dispatch({ type: "RESEND_VERIFICATION_FAILURE", payload: errorMessage });
       throw error;
     }
   };
@@ -201,6 +254,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     ...state,
     login,
     register,
+    verifyEmail,
+    resendVerification,
     logout,
     clearError,
     hasRole,

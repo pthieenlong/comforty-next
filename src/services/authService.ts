@@ -12,23 +12,26 @@ export interface RegisterRequest {
   confirmPassword: string;
 }
 
+export interface VerifyEmailRequest {
+  token: string;
+}
+
+export interface ResendVerificationRequest {
+  email: string;
+}
+
 export interface LoginResponse {
   UID: string;
   username: string;
   roles: string[];
 }
 
-export interface RegisterResponse {
-  UID: string;
-  username: string;
-  email: string;
-  message: string;
-}
-
-export interface ApiResponse<T> {
+// Simplified response structure
+export interface ApiResponse<T = any> {
+  httpCode: number;
   success: boolean;
   message: string;
-  data: T;
+  data?: T;
 }
 
 export const authService = {
@@ -38,11 +41,23 @@ export const authService = {
     return response.data;
   },
 
-  // Đăng ký
-  async register(
-    userData: RegisterRequest
-  ): Promise<ApiResponse<RegisterResponse>> {
+  // Đăng ký - chỉ trả về success/error
+  async register(userData: RegisterRequest): Promise<ApiResponse> {
     const response = await api.post("/auth/register", userData);
+    return response.data;
+  },
+
+  // Xác thực email
+  async verifyEmail(data: VerifyEmailRequest): Promise<ApiResponse> {
+    const response = await api.post("/auth/verify-email", data);
+    return response.data;
+  },
+
+  // Gửi lại email xác thực
+  async resendVerification(
+    data: ResendVerificationRequest
+  ): Promise<ApiResponse> {
+    const response = await api.post("/auth/resend-verification", data);
     return response.data;
   },
 
