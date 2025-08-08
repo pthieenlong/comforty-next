@@ -1,9 +1,11 @@
 import { configureStore } from "@reduxjs/toolkit";
 import { TypedUseSelectorHook, useDispatch, useSelector } from "react-redux";
-// import
+import cartReducer from "../store/cartSlice";
 
 export const store = configureStore({
-  reducer: {},
+  reducer: {
+    cart: cartReducer,
+  },
   devTools: process.env.NODE_ENV !== "production",
 });
 

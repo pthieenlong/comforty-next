@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useCart } from "@/common/hooks/useCart";
 
 import {
   MagnifyingGlassIcon,
@@ -19,6 +20,7 @@ import {
 
 export default function Header() {
   const router = useRouter();
+  const { itemsCount } = useCart(); // Add cart hook
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -81,7 +83,7 @@ export default function Header() {
   ];
 
   return (
-    <header className="bg-white shadow-sm border-b border-gray-200">
+    <header className="bg-white shadow-sm sticky top-0 z-50">
       {/* Top Bar */}
       <div className="bg-gray-50 border-b border-gray-200">
         <div className="container mx-auto px-4">
@@ -162,9 +164,11 @@ export default function Header() {
               className="relative p-2 text-gray-600 hover:text-gray-900"
             >
               <ShoppingCartIcon className="h-6 w-6" />
-              <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                0
-              </span>
+              {itemsCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  {itemsCount > 99 ? "99+" : itemsCount}
+                </span>
+              )}
             </Link>
 
             {/* User Account Dropdown */}
@@ -313,7 +317,7 @@ export default function Header() {
       <nav className="border-t border-gray-200">
         <div className="container mx-auto px-4">
           {/* Desktop Navigation */}
-          <div className="hidden md:flex space-x-8 h-14 items-center">
+          <div className="hidden lg:flex items-center space-x-4 py-4">
             {navigation.map((item) => (
               <Link
                 key={item.name}
