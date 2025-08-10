@@ -1,0 +1,151 @@
+import api from "@/lib/axios";
+
+export interface OrderItem {
+  slug: string;
+  quantity: number;
+  price: number;
+}
+
+export interface ShippingInfo {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  address: string;
+  city: string;
+  district: string;
+  ward: string;
+  postalCode: string;
+  notes: string;
+}
+
+export interface PaymentInfo {
+  method: "cod" | "card" | "bank";
+  cardNumber?: string;
+  expiryDate?: string;
+  cvv?: string;
+  cardName?: string;
+}
+
+export interface OrderTotals {
+  subtotal: number;
+  shipping: number;
+  tax: number;
+  total: number;
+}
+
+export interface CreateOrderRequest {
+  items: OrderItem[];
+  shipping: ShippingInfo;
+  payment: PaymentInfo;
+  totals: OrderTotals;
+  userId: string;
+}
+
+export interface OrderResponse {
+  orderId: string;
+  status: "pending" | "processing" | "shipped" | "delivered" | "cancelled";
+  items: OrderItem[];
+  shipping: ShippingInfo;
+  payment: PaymentInfo;
+  totals: OrderTotals;
+  createdAt: string;
+  updatedAt: string;
+  estimatedDelivery?: string;
+  trackingNumber?: string;
+}
+
+export interface OrderHistoryResponse {
+  orders: OrderResponse[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface ApiResponse<T> {
+  httpCode: number;
+  success: boolean;
+  message: string;
+  data?: T;
+}
+
+export const orderService = {
+  // Create new order
+  async createOrder(orderData: CreateOrderRequest): Promise<ApiResponse<OrderResponse>> {
+    const response = await api.post('/orders', orderData);
+    return response.data;
+  },
+
+  // Get order by ID
+  async getOrder(orderId: string): Promise<ApiResponse<OrderResponse>> {
+    const response = await api.get(`/orders/${orderId}`);
+    return response.data;
+  },
+
+  // Get user's order history
+  async getOrderHistory(page: number = 1, limit: number = 10): Promise<ApiResponse<OrderHistoryResponse>> {
+    const response = await api.get(`/orders/history?page=${page}&limit=${limit}`);
+    return response.data;
+  },
+
+  // Cancel order
+  async cancelOrder(orderId: string, reason?: string): Promise<ApiResponse<{ message: string }>> {
+    const response = await api.post(`/orders/${orderId}/cancel`, { reason });
+    return response.data;
+  },
+
+  // Track order
+  async trackOrder(orderId: string): Promise<ApiResponse<{
+    status: string;
+    trackingNumber?: string;
+    trackingUrl?: string;
+    updates: Array<{
+      status: string;
+      description: string;
+      timestamp: string;
+      location?: string;
+    }>;
+  }>> {
+    const response = await api.get(`/orders/${orderId}/track`);
+    return response.data;
+  },
+
+  // Get shipping methods
+  async getShippingMethods(): Promise<ApiResponse<Array<{
+    id: string;
+    name: string;
+    description: string;
+    price: number;
+    estimatedDays: string;
+  }>>> {
+    const response = await api.get('/orders/shipping-methods');
+    return response.data;
+  },
+
+  // Calculate shipping cost
+  async calculateShipping(city: string, items: OrderItem[]): Promise<ApiResponse<{
+    cost: number;
+    estimatedDays: string;
+    availableMethods: Array<{
+      id: string;
+      name: string;
+      price: number;
+      estimatedDays: string;
+    }>;
+  }>> {
+    const response = await api.post('/orders/calculate-shipping', {
+      city,
+      items,
+    });
+    return response.data;
+  },
+
+  // Validate payment method
+  async validatePayment(paymentInfo: PaymentInfo): Promise<ApiResponse<{
+    isValid: boolean;
+    message?: string;
+  }>> {
+    const response = await api.post('/orders/validate-payment', paymentInfo);
+    return response.data;
+  },
+};

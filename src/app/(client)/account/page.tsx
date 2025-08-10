@@ -1,7 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  userService,
+  UserProfile,
+  UpdateProfileRequest,
+  ChangePasswordRequest,
+} from "@/services/userService";
 import {
   UserIcon,
   ShoppingBagIcon,
@@ -15,60 +23,264 @@ import {
 const menuItems = [
   {
     id: "profile",
-    name: "Profile",
+    name: "Thông tin cá nhân",
     icon: UserIcon,
-    description: "Manage your personal information",
+    description: "Quản lý thông tin cá nhân của bạn",
   },
   {
     id: "orders",
-    name: "Orders",
+    name: "Đơn hàng",
     icon: ShoppingBagIcon,
-    description: "View your order history",
+    description: "Xem lịch sử đơn hàng",
   },
   {
     id: "wishlist",
-    name: "Wishlist",
+    name: "Danh sách yêu thích",
     icon: HeartIcon,
-    description: "Your saved items",
+    description: "Sản phẩm đã lưu",
   },
   {
     id: "settings",
-    name: "Settings",
+    name: "Cài đặt",
     icon: CogIcon,
-    description: "Account preferences",
+    description: "Tùy chọn tài khoản",
   },
   {
     id: "notifications",
-    name: "Notifications",
+    name: "Thông báo",
     icon: BellIcon,
-    description: "Manage notifications",
+    description: "Quản lý thông báo",
   },
   {
     id: "security",
-    name: "Security",
+    name: "Bảo mật",
     icon: ShieldCheckIcon,
-    description: "Password and security",
+    description: "Mật khẩu và bảo mật",
   },
 ];
 
 export default function AccountPage() {
+  const router = useRouter();
+  const { user, logout, isAuthenticated } = useAuth();
   const [activeTab, setActiveTab] = useState("profile");
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [userStats, setUserStats] = useState({
+    totalOrders: 0,
+    totalSpent: 0,
+    wishlistItems: 0,
+  });
+  const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
-  // Mock user data
-  const user = {
-    name: "John Doe",
-    email: "john.doe@example.com",
-    phone: "+84 123 456 789",
-    joinDate: "January 2024",
-    totalOrders: 12,
-    totalSpent: 25600000,
-    wishlistItems: 8,
+  // Form states
+  const [profileForm, setProfileForm] = useState<UpdateProfileRequest>({
+    fullname: "",
+    email: "",
+    phone: "",
+    address: "",
+  });
+
+  // Address form states
+  const [addressForm, setAddressForm] = useState({
+    streetAddress: "",
+    ward: "",
+    district: "",
+    city: "",
+  });
+
+  const [passwordForm, setPasswordForm] = useState<ChangePasswordRequest>({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
+
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (!isAuthenticated) {
+      router.push("/auth/sign-in");
+    }
+  }, [isAuthenticated, router]);
+
+  // Parse address from user profile
+  useEffect(() => {
+    if (userProfile?.address) {
+      // Giả sử địa chỉ có format: "Số nhà, đường, phường/xã, quận/huyện, thành phố/tỉnh"
+      const addressParts = userProfile.address
+        .split(",")
+        .map((part) => part.trim());
+
+      if (addressParts.length >= 4) {
+        setAddressForm({
+          streetAddress: addressParts[0] || "",
+          ward: addressParts[1] || "",
+          district: addressParts[2] || "",
+          city: addressParts[3] || "",
+        });
+      } else {
+        // Nếu không parse được, đặt toàn bộ vào streetAddress
+        setAddressForm({
+          streetAddress: userProfile.address,
+          ward: "",
+          district: "",
+          city: "",
+        });
+      }
+    }
+  }, [userProfile]);
+
+  // Load user profile and stats
+  useEffect(() => {
+    const loadUserData = async () => {
+      if (!user?.username) return;
+
+      try {
+        setLoading(true);
+
+        // Load user profile
+        const profileResponse = await userService.getUserProfile(user.username);
+
+        if (profileResponse.success && profileResponse.data) {
+          setUserProfile(profileResponse.data);
+          setProfileForm({
+            fullname: profileResponse.data.fullname || "",
+            email: profileResponse.data.email || "",
+            phone: profileResponse.data.phone || "",
+            address: profileResponse.data.address || "",
+          });
+        } else {
+          setError(
+            profileResponse.message || "Không thể tải thông tin người dùng"
+          );
+        }
+
+        // Load user stats
+        try {
+          const statsResponse = await userService.getUserStats(user.username);
+          if (statsResponse.success && statsResponse.data) {
+            setUserStats(statsResponse.data);
+          }
+        } catch (statsError) {
+          console.warn("Could not load user stats:", statsError);
+          // Stats không bắt buộc, nên không throw error
+        }
+      } catch (error: any) {
+        setError(error.message || "Có lỗi xảy ra khi tải thông tin");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadUserData();
+  }, [user?.username]);
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      router.push("/");
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("user");
-    window.location.href = "/";
+  const handleProfileUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user?.username) return;
+
+    try {
+      setUpdating(true);
+      setError(null);
+      setSuccess(null);
+
+      // Gộp địa chỉ từ các trường riêng biệt
+      const fullAddress = [
+        addressForm.streetAddress,
+        addressForm.ward,
+        addressForm.district,
+        addressForm.city,
+      ]
+        .filter((part) => part.trim())
+        .join(", ");
+
+      const updateData = {
+        ...profileForm,
+        address: fullAddress,
+      };
+
+      const response = await userService.updateProfile(
+        user.username,
+        updateData
+      );
+
+      if (response.success && response.data) {
+        setUserProfile(response.data);
+        setSuccess("Cập nhật thông tin thành công!");
+      } else {
+        setError(response.message || "Cập nhật thất bại");
+      }
+    } catch (error: any) {
+      setError(error.message || "Có lỗi xảy ra khi cập nhật");
+    } finally {
+      setUpdating(false);
+    }
   };
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user?.username) return;
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setError("Mật khẩu mới không khớp");
+      return;
+    }
+
+    try {
+      setUpdating(true);
+      setError(null);
+      setSuccess(null);
+
+      const response = await userService.changePassword(
+        user.username,
+        passwordForm
+      );
+
+      if (response.success) {
+        setSuccess("Đổi mật khẩu thành công!");
+        setPasswordForm({
+          currentPassword: "",
+          newPassword: "",
+          confirmPassword: "",
+        });
+      } else {
+        setError(response.message || "Đổi mật khẩu thất bại");
+      }
+    } catch (error: any) {
+      setError(error.message || "Có lỗi xảy ra khi đổi mật khẩu");
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  if (!isAuthenticated) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -79,35 +291,53 @@ export default function AccountPage() {
             {/* User Info */}
             <div className="text-center mb-6">
               <div className="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-white text-2xl font-bold">
-                  {user.name
-                    .split(" ")
-                    .map((n) => n[0])
-                    .join("")}
-                </span>
+                {userProfile?.avatar ? (
+                  <img
+                    src={userProfile.avatar}
+                    alt={userProfile.fullname}
+                    className="w-20 h-20 rounded-full object-cover"
+                  />
+                ) : (
+                  <span className="text-white text-2xl font-bold">
+                    {userProfile?.fullname
+                      ? userProfile.fullname
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")
+                      : user?.username?.charAt(0).toUpperCase()}
+                  </span>
+                )}
               </div>
               <h2 className="text-xl font-semibold text-gray-900">
-                {user.name}
+                {userProfile?.fullname || user?.username}
               </h2>
-              <p className="text-gray-600">{user.email}</p>
+              <p className="text-gray-600">{userProfile?.email}</p>
               <p className="text-sm text-gray-500 mt-1">
-                Member since {user.joinDate}
+                Thành viên từ{" "}
+                {userProfile?.createdAt
+                  ? new Date(userProfile.createdAt).toLocaleDateString("vi-VN")
+                  : "N/A"}
               </p>
+              {userProfile?.isVerified === 1 && (
+                <span className="inline-block mt-2 px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
+                  Đã xác thực
+                </span>
+              )}
             </div>
 
             {/* Stats */}
             <div className="grid grid-cols-2 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
               <div className="text-center">
                 <div className="text-2xl font-bold text-blue-600">
-                  {user.totalOrders}
+                  {userStats.totalOrders}
                 </div>
-                <div className="text-xs text-gray-600">Orders</div>
+                <div className="text-xs text-gray-600">Đơn hàng</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-green-600">
-                  ₫{(user.totalSpent / 1000000).toFixed(1)}M
+                  ₫{(userStats.totalSpent / 1000000).toFixed(1)}M
                 </div>
-                <div className="text-xs text-gray-600">Spent</div>
+                <div className="text-xs text-gray-600">Đã chi</div>
               </div>
             </div>
 
@@ -133,7 +363,7 @@ export default function AccountPage() {
                 className="w-full flex items-center px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors mt-4"
               >
                 <ArrowRightOnRectangleIcon className="h-5 w-5 mr-3" />
-                Sign Out
+                Đăng xuất
               </button>
             </nav>
           </div>
@@ -142,74 +372,188 @@ export default function AccountPage() {
         {/* Main Content */}
         <div className="lg:col-span-3">
           <div className="bg-white border border-gray-200 rounded-lg p-6">
+            {/* Error/Success Messages */}
+            {error && (
+              <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-red-600">{error}</p>
+              </div>
+            )}
+            {success && (
+              <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                <p className="text-green-600">{success}</p>
+              </div>
+            )}
+
             {/* Profile Tab */}
             {activeTab === "profile" && (
               <div>
                 <h1 className="text-2xl font-bold text-gray-900 mb-6">
-                  Profile Information
+                  Thông tin cá nhân
                 </h1>
 
-                <form className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        First Name
-                      </label>
-                      <input
-                        type="text"
-                        defaultValue="John"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Last Name
-                      </label>
-                      <input
-                        type="text"
-                        defaultValue="Doe"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    </div>
+                <form onSubmit={handleProfileUpdate} className="space-y-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Họ và tên
+                    </label>
+                    <input
+                      type="text"
+                      value={profileForm.fullname}
+                      onChange={(e) =>
+                        setProfileForm((prev) => ({
+                          ...prev,
+                          fullname: e.target.value,
+                        }))
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Email Address
+                      Email
                     </label>
                     <input
                       type="email"
-                      defaultValue={user.email}
+                      value={profileForm.email}
+                      onChange={(e) =>
+                        setProfileForm((prev) => ({
+                          ...prev,
+                          email: e.target.value,
+                        }))
+                      }
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Phone Number
+                      Số điện thoại
                     </label>
                     <input
                       type="tel"
-                      defaultValue={user.phone}
+                      value={profileForm.phone}
+                      onChange={(e) =>
+                        setProfileForm((prev) => ({
+                          ...prev,
+                          phone: e.target.value,
+                        }))
+                      }
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Date of Birth
-                    </label>
-                    <input
-                      type="date"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
+                  {/* Address Section */}
+                  <div className="border-t border-gray-200 pt-6">
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">
+                      Thông tin địa chỉ
+                    </h3>
+
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Địa chỉ chính thức *
+                        </label>
+                        <input
+                          type="text"
+                          value={addressForm.streetAddress}
+                          onChange={(e) =>
+                            setAddressForm((prev) => ({
+                              ...prev,
+                              streetAddress: e.target.value,
+                            }))
+                          }
+                          placeholder="Số nhà, tên đường, phố..."
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Phường/Thị xã
+                          </label>
+                          <input
+                            type="text"
+                            value={addressForm.ward}
+                            onChange={(e) =>
+                              setAddressForm((prev) => ({
+                                ...prev,
+                                ward: e.target.value,
+                              }))
+                            }
+                            placeholder="Phường/Thị xã"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Quận/Huyện
+                          </label>
+                          <input
+                            type="text"
+                            value={addressForm.district}
+                            onChange={(e) =>
+                              setAddressForm((prev) => ({
+                                ...prev,
+                                district: e.target.value,
+                              }))
+                            }
+                            placeholder="Quận/Huyện"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Thành phố/Tỉnh
+                          </label>
+                          <input
+                            type="text"
+                            value={addressForm.city}
+                            onChange={(e) =>
+                              setAddressForm((prev) => ({
+                                ...prev,
+                                city: e.target.value,
+                              }))
+                            }
+                            placeholder="Thành phố/Tỉnh"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Preview địa chỉ đầy đủ */}
+                      {addressForm.streetAddress ||
+                      addressForm.ward ||
+                      addressForm.district ||
+                      addressForm.city ? (
+                        <div className="p-3 bg-gray-50 rounded-lg">
+                          <p className="text-sm text-gray-600 mb-1">
+                            Địa chỉ đầy đủ:
+                          </p>
+                          <p className="text-sm font-medium text-gray-900">
+                            {[
+                              addressForm.streetAddress,
+                              addressForm.ward,
+                              addressForm.district,
+                              addressForm.city,
+                            ]
+                              .filter((part) => part.trim())
+                              .join(", ")}
+                          </p>
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
 
                   <button
                     type="submit"
-                    className="px-6 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                    disabled={updating}
+                    className="px-6 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
                   >
-                    Save Changes
+                    {updating ? "Đang cập nhật..." : "Lưu thay đổi"}
                   </button>
                 </form>
               </div>
@@ -220,90 +564,27 @@ export default function AccountPage() {
               <div>
                 <div className="flex items-center justify-between mb-6">
                   <h1 className="text-2xl font-bold text-gray-900">
-                    Order History
+                    Lịch sử đơn hàng
                   </h1>
                   <Link
                     href="/shop"
                     className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
                   >
-                    Continue Shopping
+                    Tiếp tục mua sắm
                   </Link>
                 </div>
 
-                {/* Order List */}
-                <div className="space-y-4">
-                  {[
-                    {
-                      id: "ORD-001",
-                      date: "2024-01-15",
-                      status: "Delivered",
-                      total: 2500000,
-                      items: 2,
-                    },
-                    {
-                      id: "ORD-002",
-                      date: "2024-01-10",
-                      status: "Shipped",
-                      total: 8500000,
-                      items: 1,
-                    },
-                    {
-                      id: "ORD-003",
-                      date: "2024-01-05",
-                      status: "Processing",
-                      total: 1200000,
-                      items: 3,
-                    },
-                  ].map((order) => (
-                    <div
-                      key={order.id}
-                      className="border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="font-semibold text-gray-900">
-                            {order.id}
-                          </h3>
-                          <p className="text-sm text-gray-600">
-                            {order.date} • {order.items} item
-                            {order.items !== 1 ? "s" : ""}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <div className="font-semibold text-gray-900">
-                            ₫{order.total.toLocaleString("vi-VN")}
-                          </div>
-                          <div
-                            className={`text-sm font-medium ${
-                              order.status === "Delivered"
-                                ? "text-green-600"
-                                : order.status === "Shipped"
-                                ? "text-blue-600"
-                                : "text-yellow-600"
-                            }`}
-                          >
-                            {order.status}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="mt-4 flex space-x-3">
-                        <Link
-                          href={`/account/orders/${order.id}`}
-                          className="text-blue-600 hover:text-blue-700 text-sm font-medium"
-                        >
-                          View Details
-                        </Link>
-                        <button className="text-gray-600 hover:text-gray-700 text-sm font-medium">
-                          Track Order
-                        </button>
-                        {order.status === "Delivered" && (
-                          <button className="text-gray-600 hover:text-gray-700 text-sm font-medium">
-                            Reorder
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                <div className="text-center py-8">
+                  <ShoppingBagIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-600 mb-4">
+                    Bạn có {userStats.totalOrders} đơn hàng
+                  </p>
+                  <Link
+                    href="/account/orders"
+                    className="inline-flex items-center px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Xem tất cả đơn hàng
+                  </Link>
                 </div>
               </div>
             )}
@@ -313,26 +594,27 @@ export default function AccountPage() {
               <div>
                 <div className="flex items-center justify-between mb-6">
                   <h1 className="text-2xl font-bold text-gray-900">
-                    My Wishlist
+                    Danh sách yêu thích
                   </h1>
                   <Link
                     href="/wishlist"
                     className="text-blue-600 hover:text-blue-700 font-medium"
                   >
-                    View Full Wishlist
+                    Xem danh sách đầy đủ
                   </Link>
                 </div>
 
                 <div className="text-center py-8">
                   <HeartIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
                   <p className="text-gray-600 mb-4">
-                    You have {user.wishlistItems} items in your wishlist
+                    Bạn có {userStats.wishlistItems} sản phẩm trong danh sách
+                    yêu thích
                   </p>
                   <Link
                     href="/wishlist"
                     className="inline-flex items-center px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
                   >
-                    View Wishlist
+                    Xem danh sách yêu thích
                   </Link>
                 </div>
               </div>
@@ -342,22 +624,22 @@ export default function AccountPage() {
             {activeTab === "settings" && (
               <div>
                 <h1 className="text-2xl font-bold text-gray-900 mb-6">
-                  Account Settings
+                  Cài đặt tài khoản
                 </h1>
 
                 <div className="space-y-6">
                   <div className="border-b border-gray-200 pb-6">
                     <h3 className="text-lg font-medium text-gray-900 mb-4">
-                      Preferences
+                      Tùy chọn
                     </h3>
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="font-medium text-gray-900">
-                            Email Notifications
+                            Thông báo Email
                           </p>
                           <p className="text-sm text-gray-600">
-                            Receive email updates about your orders
+                            Nhận cập nhật email về đơn hàng của bạn
                           </p>
                         </div>
                         <input
@@ -369,10 +651,10 @@ export default function AccountPage() {
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="font-medium text-gray-900">
-                            SMS Notifications
+                            Thông báo SMS
                           </p>
                           <p className="text-sm text-gray-600">
-                            Receive SMS updates about your orders
+                            Nhận cập nhật SMS về đơn hàng của bạn
                           </p>
                         </div>
                         <input
@@ -383,10 +665,10 @@ export default function AccountPage() {
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="font-medium text-gray-900">
-                            Marketing Emails
+                            Email Marketing
                           </p>
                           <p className="text-sm text-gray-600">
-                            Receive promotional offers and news
+                            Nhận ưu đãi và tin tức khuyến mãi
                           </p>
                         </div>
                         <input
@@ -400,21 +682,21 @@ export default function AccountPage() {
 
                   <div>
                     <h3 className="text-lg font-medium text-gray-900 mb-4">
-                      Language & Region
+                      Ngôn ngữ & Khu vực
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Language
+                          Ngôn ngữ
                         </label>
                         <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                          <option>English</option>
                           <option>Tiếng Việt</option>
+                          <option>English</option>
                         </select>
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Currency
+                          Tiền tệ
                         </label>
                         <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                           <option>VND (₫)</option>
@@ -431,74 +713,96 @@ export default function AccountPage() {
             {activeTab === "security" && (
               <div>
                 <h1 className="text-2xl font-bold text-gray-900 mb-6">
-                  Security
+                  Bảo mật
                 </h1>
 
                 <div className="space-y-6">
                   <div className="border border-gray-200 rounded-lg p-6">
                     <h3 className="text-lg font-medium text-gray-900 mb-4">
-                      Change Password
+                      Đổi mật khẩu
                     </h3>
-                    <form className="space-y-4">
+                    <form onSubmit={handlePasswordChange} className="space-y-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Current Password
+                          Mật khẩu hiện tại
                         </label>
                         <input
                           type="password"
+                          value={passwordForm.currentPassword}
+                          onChange={(e) =>
+                            setPasswordForm((prev) => ({
+                              ...prev,
+                              currentPassword: e.target.value,
+                            }))
+                          }
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                          New Password
+                          Mật khẩu mới
                         </label>
                         <input
                           type="password"
+                          value={passwordForm.newPassword}
+                          onChange={(e) =>
+                            setPasswordForm((prev) => ({
+                              ...prev,
+                              newPassword: e.target.value,
+                            }))
+                          }
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Confirm New Password
+                          Xác nhận mật khẩu mới
                         </label>
                         <input
                           type="password"
+                          value={passwordForm.confirmPassword}
+                          onChange={(e) =>
+                            setPasswordForm((prev) => ({
+                              ...prev,
+                              confirmPassword: e.target.value,
+                            }))
+                          }
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         />
                       </div>
                       <button
                         type="submit"
-                        className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                        disabled={updating}
+                        className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
                       >
-                        Update Password
+                        {updating ? "Đang cập nhật..." : "Cập nhật mật khẩu"}
                       </button>
                     </form>
                   </div>
 
                   <div className="border border-gray-200 rounded-lg p-6">
                     <h3 className="text-lg font-medium text-gray-900 mb-4">
-                      Two-Factor Authentication
+                      Xác thực hai yếu tố
                     </h3>
                     <p className="text-gray-600 mb-4">
-                      Add an extra layer of security to your account
+                      Thêm một lớp bảo mật bổ sung cho tài khoản của bạn
                     </p>
                     <button className="px-4 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors">
-                      Enable 2FA
+                      Bật 2FA
                     </button>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Other tabs can be implemented similarly */}
+            {/* Notifications Tab */}
             {activeTab === "notifications" && (
               <div>
                 <h1 className="text-2xl font-bold text-gray-900 mb-6">
-                  Notifications
+                  Thông báo
                 </h1>
                 <p className="text-gray-600">
-                  Notification settings will be implemented here.
+                  Cài đặt thông báo sẽ được triển khai tại đây.
                 </p>
               </div>
             )}
@@ -508,4 +812,3 @@ export default function AccountPage() {
     </div>
   );
 }
-
