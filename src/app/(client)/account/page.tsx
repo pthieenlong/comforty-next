@@ -82,16 +82,8 @@ export default function AccountPage() {
     address: "",
   });
 
-  // Address form states
-  const [addressForm, setAddressForm] = useState({
-    streetAddress: "",
-    ward: "",
-    district: "",
-    city: "",
-  });
-
   const [passwordForm, setPasswordForm] = useState<ChangePasswordRequest>({
-    currentPassword: "",
+    oldPassword: "",
     newPassword: "",
     confirmPassword: "",
   });
@@ -102,33 +94,6 @@ export default function AccountPage() {
       router.push("/auth/sign-in");
     }
   }, [isAuthenticated, router]);
-
-  // Parse address from user profile
-  useEffect(() => {
-    if (userProfile?.address) {
-      // Giả sử địa chỉ có format: "Số nhà, đường, phường/xã, quận/huyện, thành phố/tỉnh"
-      const addressParts = userProfile.address
-        .split(",")
-        .map((part) => part.trim());
-
-      if (addressParts.length >= 4) {
-        setAddressForm({
-          streetAddress: addressParts[0] || "",
-          ward: addressParts[1] || "",
-          district: addressParts[2] || "",
-          city: addressParts[3] || "",
-        });
-      } else {
-        // Nếu không parse được, đặt toàn bộ vào streetAddress
-        setAddressForm({
-          streetAddress: userProfile.address,
-          ward: "",
-          district: "",
-          city: "",
-        });
-      }
-    }
-  }, [userProfile]);
 
   // Load user profile and stats
   useEffect(() => {
@@ -193,20 +158,7 @@ export default function AccountPage() {
       setError(null);
       setSuccess(null);
 
-      // Gộp địa chỉ từ các trường riêng biệt
-      const fullAddress = [
-        addressForm.streetAddress,
-        addressForm.ward,
-        addressForm.district,
-        addressForm.city,
-      ]
-        .filter((part) => part.trim())
-        .join(", ");
-
-      const updateData = {
-        ...profileForm,
-        address: fullAddress,
-      };
+      const updateData = profileForm;
 
       const response = await userService.updateProfile(
         user.username,
@@ -248,7 +200,7 @@ export default function AccountPage() {
       if (response.success) {
         setSuccess("Đổi mật khẩu thành công!");
         setPasswordForm({
-          currentPassword: "",
+          oldPassword: "",
           newPassword: "",
           confirmPassword: "",
         });
@@ -318,7 +270,7 @@ export default function AccountPage() {
                   ? new Date(userProfile.createdAt).toLocaleDateString("vi-VN")
                   : "N/A"}
               </p>
-              {userProfile?.isVerified === 1 && (
+              {userProfile?.isVerified === "VERIFIED" && (
                 <span className="inline-block mt-2 px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
                   Đã xác thực
                 </span>
@@ -449,102 +401,22 @@ export default function AccountPage() {
                       Thông tin địa chỉ
                     </h3>
 
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Địa chỉ chính thức *
-                        </label>
-                        <input
-                          type="text"
-                          value={addressForm.streetAddress}
-                          onChange={(e) =>
-                            setAddressForm((prev) => ({
-                              ...prev,
-                              streetAddress: e.target.value,
-                            }))
-                          }
-                          placeholder="Số nhà, tên đường, phố..."
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Phường/Thị xã
-                          </label>
-                          <input
-                            type="text"
-                            value={addressForm.ward}
-                            onChange={(e) =>
-                              setAddressForm((prev) => ({
-                                ...prev,
-                                ward: e.target.value,
-                              }))
-                            }
-                            placeholder="Phường/Thị xã"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Quận/Huyện
-                          </label>
-                          <input
-                            type="text"
-                            value={addressForm.district}
-                            onChange={(e) =>
-                              setAddressForm((prev) => ({
-                                ...prev,
-                                district: e.target.value,
-                              }))
-                            }
-                            placeholder="Quận/Huyện"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Thành phố/Tỉnh
-                          </label>
-                          <input
-                            type="text"
-                            value={addressForm.city}
-                            onChange={(e) =>
-                              setAddressForm((prev) => ({
-                                ...prev,
-                                city: e.target.value,
-                              }))
-                            }
-                            placeholder="Thành phố/Tỉnh"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Preview địa chỉ đầy đủ */}
-                      {addressForm.streetAddress ||
-                      addressForm.ward ||
-                      addressForm.district ||
-                      addressForm.city ? (
-                        <div className="p-3 bg-gray-50 rounded-lg">
-                          <p className="text-sm text-gray-600 mb-1">
-                            Địa chỉ đầy đủ:
-                          </p>
-                          <p className="text-sm font-medium text-gray-900">
-                            {[
-                              addressForm.streetAddress,
-                              addressForm.ward,
-                              addressForm.district,
-                              addressForm.city,
-                            ]
-                              .filter((part) => part.trim())
-                              .join(", ")}
-                          </p>
-                        </div>
-                      ) : null}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Địa chỉ chính thức *
+                      </label>
+                      <input
+                        type="text"
+                        value={profileForm.address}
+                        onChange={(e) =>
+                          setProfileForm((prev) => ({
+                            ...prev,
+                            address: e.target.value,
+                          }))
+                        }
+                        placeholder="Số nhà, tên đường, phường/xã, quận/huyện, tỉnh/thành phố..."
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
                     </div>
                   </div>
 
@@ -728,11 +600,11 @@ export default function AccountPage() {
                         </label>
                         <input
                           type="password"
-                          value={passwordForm.currentPassword}
+                          value={passwordForm.oldPassword}
                           onChange={(e) =>
                             setPasswordForm((prev) => ({
                               ...prev,
-                              currentPassword: e.target.value,
+                              oldPassword: e.target.value,
                             }))
                           }
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"

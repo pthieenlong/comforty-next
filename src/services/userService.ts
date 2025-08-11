@@ -25,7 +25,7 @@ export interface UpdateProfileRequest {
 }
 
 export interface ChangePasswordRequest {
-  currentPassword: string;
+  oldPassword: string;
   newPassword: string;
   confirmPassword: string;
 }
@@ -58,7 +58,7 @@ export const userService = {
     username: string,
     data: ChangePasswordRequest
   ): Promise<ApiResponse> {
-    const response = await api.put(`/user/${username}/password`, data);
+    const response = await api.patch(`/auth/${username}/update-password`, data);
     return response.data;
   },
 

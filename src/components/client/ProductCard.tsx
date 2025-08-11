@@ -115,7 +115,7 @@ export default function ProductCard({
             </div>
 
             {/* Product Title */}
-            <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2 group-hover:text-blue-600 transition-colors">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2 h-14 line-clamp-2 group-hover:text-blue-600 transition-colors">
               {product.title}
             </h3>
 
@@ -251,7 +251,7 @@ export default function ProductCard({
           </div>
 
           {/* Product Title */}
-          <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2 group-hover:text-blue-600 transition-colors">
+          <h3 className="text-lg font-semibold text-gray-900 mb-2 h-14 line-clamp-2 group-hover:text-blue-600 transition-colors">
             {product.title}
           </h3>
 
