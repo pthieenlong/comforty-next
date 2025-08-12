@@ -30,12 +30,10 @@ function ShopPageContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
 
-  // UI States
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>("newest");
 
-  // Filter States
   const [filters, setFilters] = useState({
     category: searchParams.get("category") || "",
     priceMin: searchParams.get("priceMin") || "",
@@ -44,7 +42,6 @@ function ShopPageContent() {
     search: searchParams.get("search") || "",
   });
 
-  // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 12;
 
@@ -61,8 +58,8 @@ function ShopPageContent() {
 
         const endpoint = params.toString()
           ? `/product?${params.toString()}`
-          : "/product";
-        const response = await api.get<ApiResponse>("product");
+          : "/product"
+        const response = await api.get<ApiResponse>(endpoint);
 
         if (response.data.success) {
           setProducts(response.data.data);
@@ -80,11 +77,9 @@ function ShopPageContent() {
     fetchProducts();
   }, [filters.category, filters.search]);
 
-  // Filter and sort products
   const filteredAndSortedProducts = useMemo(() => {
     let filtered = [...products];
 
-    // Apply filters
     if (filters.priceMin) {
       filtered = filtered.filter((p) => p.price >= Number(filters.priceMin));
     }
@@ -95,7 +90,6 @@ function ShopPageContent() {
       filtered = filtered.filter((p) => p.isSale);
     }
 
-    // Apply sorting
     switch (sortBy) {
       case "price-low":
         filtered.sort((a, b) => {

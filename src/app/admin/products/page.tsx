@@ -332,12 +332,11 @@ export default function ProductsPage() {
                     <td className="px-4 py-3">#{p.id}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <div className="relative size-11 overflow-hidden rounded-md border border-neutral-200 bg-neutral-50">
+                        <div className="relative size-11 overflow-hidden rounded-md border border-neutral-200 bg-neutral-50 min-w-14 max-w-20">
                           <Image
                             alt={p.title}
                             src={p.image}
                             fill
-                            sizes="44px"
                             className="object-contain p-1.5"
                           />
                         </div>

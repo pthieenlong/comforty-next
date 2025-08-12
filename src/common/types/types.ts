@@ -7,6 +7,7 @@ export interface IShortProductResponse {
   price: number;
   isSale: boolean;
   salePercent: number;
+  rating: number;
   isVisible: boolean;
   createdAt: Date;
 }

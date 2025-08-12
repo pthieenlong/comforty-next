@@ -29,7 +29,6 @@ const initialState: ICart = {
   total: 0,
 };
 
-// Helper function to calculate cart totals
 const calculateCartTotals = (items: ICartItem[]) => {
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
   const subtotal = items.reduce(
@@ -37,7 +36,6 @@ const calculateCartTotals = (items: ICartItem[]) => {
     0
   );
 
-  // Calculate discount based on original prices
   const discount = items.reduce((sum, item) => {
     if (item.originalPrice) {
       return sum + (item.originalPrice - item.price) * item.quantity;
@@ -54,21 +52,17 @@ const cartSlice = createSlice({
   name: "cart",
   initialState,
   reducers: {
-    // Add item to cart
     addToCart: (state, action: PayloadAction<Omit<ICartItem, "quantity">>) => {
       const existingItem = state.items.find(
         (item) => item.slug === action.payload.slug
       );
 
       if (existingItem) {
-        // If item already exists, increase quantity
         existingItem.quantity += 1;
       } else {
-        // Add new item with quantity 1
         state.items.push({ ...action.payload, quantity: 1 });
       }
 
-      // Recalculate totals
       const totals = calculateCartTotals(state.items);
       state.totalItems = totals.totalItems;
       state.subtotal = totals.subtotal;
@@ -76,11 +70,9 @@ const cartSlice = createSlice({
       state.total = totals.total;
     },
 
-    // Remove item from cart completely
     removeFromCart: (state, action: PayloadAction<string>) => {
       state.items = state.items.filter((item) => item.slug !== action.payload);
 
-      // Recalculate totals
       const totals = calculateCartTotals(state.items);
       state.totalItems = totals.totalItems;
       state.subtotal = totals.subtotal;
@@ -88,7 +80,6 @@ const cartSlice = createSlice({
       state.total = totals.total;
     },
 
-    // Update item quantity
     updateQuantity: (
       state,
       action: PayloadAction<{ slug: string; quantity: number }>
@@ -98,13 +89,11 @@ const cartSlice = createSlice({
 
       if (item) {
         if (quantity <= 0) {
-          // Remove item if quantity is 0 or less
           state.items = state.items.filter((item) => item.slug !== slug);
         } else {
           item.quantity = quantity;
         }
 
-        // Recalculate totals
         const totals = calculateCartTotals(state.items);
         state.totalItems = totals.totalItems;
         state.subtotal = totals.subtotal;
@@ -113,14 +102,12 @@ const cartSlice = createSlice({
       }
     },
 
-    // Increase item quantity by 1
     increaseQuantity: (state, action: PayloadAction<string>) => {
       const item = state.items.find((item) => item.slug === action.payload);
 
       if (item) {
         item.quantity += 1;
 
-        // Recalculate totals
         const totals = calculateCartTotals(state.items);
         state.totalItems = totals.totalItems;
         state.subtotal = totals.subtotal;
@@ -129,13 +116,11 @@ const cartSlice = createSlice({
       }
     },
 
-    // Decrease item quantity by 1
     decreaseQuantity: (state, action: PayloadAction<string>) => {
       const item = state.items.find((item) => item.slug === action.payload);
 
       if (item) {
         if (item.quantity <= 1) {
-          // Remove item if quantity becomes 0
           state.items = state.items.filter(
             (item) => item.slug !== action.payload
           );
@@ -143,7 +128,6 @@ const cartSlice = createSlice({
           item.quantity -= 1;
         }
 
-        // Recalculate totals
         const totals = calculateCartTotals(state.items);
         state.totalItems = totals.totalItems;
         state.subtotal = totals.subtotal;
@@ -152,7 +136,6 @@ const cartSlice = createSlice({
       }
     },
 
-    // Clear entire cart
     clearCart: (state) => {
       state.items = [];
       state.totalItems = 0;
@@ -161,7 +144,6 @@ const cartSlice = createSlice({
       state.total = 0;
     },
 
-    // Update item stock status
     updateItemStock: (
       state,
       action: PayloadAction<{ slug: string; inStock: boolean }>
@@ -174,11 +156,9 @@ const cartSlice = createSlice({
       }
     },
 
-    // Load cart from localStorage (for persistence)
     loadCart: (state, action: PayloadAction<ICartItem[]>) => {
       state.items = action.payload;
 
-      // Recalculate totals
       const totals = calculateCartTotals(state.items);
       state.totalItems = totals.totalItems;
       state.subtotal = totals.subtotal;

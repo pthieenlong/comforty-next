@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/24/outline";
+import api from "@/lib/axios";
 
 interface FilterProps {
   filters: {
@@ -13,22 +14,6 @@ interface FilterProps {
   };
   onFiltersChange: (filters: FilterProps["filters"]) => void;
 }
-const categories = [
-  { id: "phong-ngu", name: "Phòng ngủ", count: 45 },
-  { id: "sofa", name: "Sofa", count: 32 },
-  { id: "ban", name: "Bàn", count: 28 },
-  { id: "tu-quan-ao", name: "Tủ quần áo", count: 38 },
-  { id: "giuong-ngu", name: "Giường ngủ", count: 25 },
-  { id: "tu-dau-giuong", name: "Tủ đầu giường", count: 52 },
-  { id: "ke-sach", name: "Kệ", count: 34 },
-  { id: "luu-tru", name: "Lưu trữ", count: 19 },
-  { id: "combo", name: "Combo", count: 15 },
-  { id: "vienna-collection", name: "Vienna Collection", count: 22 },
-  { id: "signature-collection", name: "Signature Collection", count: 18 },
-  { id: "cao-cap", name: "Cao cấp", count: 30 },
-  { id: "noi-that", name: "Nội thất", count: 120 },
-  { id: "khac", name: "Khác", count: 25 },
-];
 const priceRanges = [
   { id: "under-500k", label: "Under ₫500,000", min: "", max: "500000" },
   {
@@ -51,6 +36,17 @@ const priceRanges = [
   },
   { id: "over-5m", label: "Over ₫5,000,000", min: "5000000", max: "" },
 ];
+interface ICategoryResponse {
+  slug: string,
+  name: string,
+  productCount: number,
+}
+interface ApiResponse {
+  httpCode: number;
+  success: boolean;
+  message: string;
+  data: ICategoryResponse[];
+}
 
 export default function ProductFilters({
   filters,
@@ -61,7 +57,18 @@ export default function ProductFilters({
     price: true,
     features: true,
   });
+  const [categories, setCategories] = useState<ICategoryResponse[]>([]);
 
+  useEffect(() => {
+    const fetchCategory = async () => {
+      const endpoint = `category/count`
+      const response = await api.get<ApiResponse>(endpoint);
+      if(response.data.success) {
+        setCategories(response.data.data);
+      }
+    }
+    fetchCategory();
+  }, [])
   const toggleSection = (section: keyof typeof expandedSections) => {
     setExpandedSections((prev) => ({
       ...prev,
@@ -147,20 +154,20 @@ export default function ProductFilters({
           <div className="mt-4 space-y-3">
             {categories.map((category) => (
               <label
-                key={category.id}
+                key={category.slug}
                 className="flex items-center cursor-pointer"
               >
                 <input
                   type="checkbox"
-                  checked={filters.category === category.id}
-                  onChange={() => handleCategoryChange(category.id)}
+                  checked={filters.category === category.slug}
+                  onChange={() => handleCategoryChange(category.slug)}
                   className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                 />
-                <span className="ml-3 text-sm text-gray-700 flex-1">
+                <span className="ml-3 text-sm text-gray-700 flex-1 capitalize">
                   {category.name}
                 </span>
                 <span className="text-xs text-gray-500">
-                  ({category.count})
+                  ({category.productCount})
                 </span>
               </label>
             ))}
@@ -254,7 +261,7 @@ export default function ProductFilters({
           <div className="flex flex-wrap gap-2">
             {filters.category && (
               <span className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
-                {categories.find((c) => c.id === filters.category)?.name}
+                {categories.find((c) => c.slug === filters.category)?.name}
                 <button
                   onClick={() => handleCategoryChange(filters.category)}
                   className="ml-1 text-blue-600 hover:text-blue-800"
