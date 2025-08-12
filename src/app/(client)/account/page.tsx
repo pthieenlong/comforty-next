@@ -295,20 +295,35 @@ export default function AccountPage() {
 
             {/* Navigation */}
             <nav className="space-y-1">
-              {menuItems.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => setActiveTab(item.id)}
-                  className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                    activeTab === item.id
-                      ? "bg-blue-100 text-blue-700"
-                      : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-                  }`}
-                >
-                  <item.icon className="h-5 w-5 mr-3" />
-                  {item.name}
-                </button>
-              ))}
+              {menuItems.map((item) => {
+                if (item.id === "orders") {
+                  return (
+                    <Link
+                      key={item.id}
+                      href="/account/orders"
+                      className="w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                    >
+                      <item.icon className="h-5 w-5 mr-3" />
+                      {item.name}
+                    </Link>
+                  );
+                }
+
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveTab(item.id)}
+                    className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                      activeTab === item.id
+                        ? "bg-blue-100 text-blue-700"
+                        : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                    }`}
+                  >
+                    <item.icon className="h-5 w-5 mr-3" />
+                    {item.name}
+                  </button>
+                );
+              })}
 
               <button
                 onClick={handleLogout}
@@ -428,36 +443,6 @@ export default function AccountPage() {
                     {updating ? "Đang cập nhật..." : "Lưu thay đổi"}
                   </button>
                 </form>
-              </div>
-            )}
-
-            {/* Orders Tab */}
-            {activeTab === "orders" && (
-              <div>
-                <div className="flex items-center justify-between mb-6">
-                  <h1 className="text-2xl font-bold text-gray-900">
-                    Lịch sử đơn hàng
-                  </h1>
-                  <Link
-                    href="/shop"
-                    className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    Tiếp tục mua sắm
-                  </Link>
-                </div>
-
-                <div className="text-center py-8">
-                  <ShoppingBagIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-600 mb-4">
-                    Bạn có {userStats.totalOrders} đơn hàng
-                  </p>
-                  <Link
-                    href="/account/orders"
-                    className="inline-flex items-center px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    Xem tất cả đơn hàng
-                  </Link>
-                </div>
               </div>
             )}
 

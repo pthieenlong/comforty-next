@@ -2,10 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { OrderResponse } from "@/services/orderService";
-import api from "@/lib/axios";
+import { useAuth } from "@/contexts/AuthContext";
+import { orderService, OrderResponse } from "@/services/orderService";
 import Link from "next/link";
-import Image from "next/image";
 import {
   ArrowLeftIcon,
   ClockIcon,
@@ -16,130 +15,79 @@ import {
   PhoneIcon,
   EnvelopeIcon,
   UserIcon,
-  PencilIcon,
 } from "@heroicons/react/24/outline";
-
-const statusOptions = [
-  {
-    value: "PENDING",
-    label: "Chờ xử lý",
-    color: "bg-yellow-100 text-yellow-800",
-  },
-  {
-    value: "PAID",
-    label: "Đã thanh toán",
-    color: "bg-blue-100 text-blue-800",
-  },
-  {
-    value: "SHIPPING",
-    label: "Đang giao",
-    color: "bg-purple-100 text-purple-800",
-  },
-  {
-    value: "COMPLETED",
-    label: "Hoàn tất",
-    color: "bg-green-100 text-green-800",
-  },
-  { value: "CANCELLED", label: "Đã hủy", color: "bg-red-100 text-red-800" },
-];
 
 const statusConfig = {
   PENDING: {
     label: "Chờ xử lý",
     icon: ClockIcon,
     color: "text-yellow-600 bg-yellow-100",
+    description: "Đơn hàng đang được xử lý",
   },
   PAID: {
     label: "Đã thanh toán",
     icon: CheckCircleIcon,
     color: "text-blue-600 bg-blue-100",
+    description: "Đơn hàng đã được thanh toán",
   },
   SHIPPING: {
     label: "Đang giao",
     icon: TruckIcon,
     color: "text-purple-600 bg-purple-100",
+    description: "Đơn hàng đang được vận chuyển",
   },
   COMPLETED: {
-    label: "Hoàn tất",
+    label: "Hoàn thành",
     icon: CheckCircleIcon,
     color: "text-green-600 bg-green-100",
+    description: "Đơn hàng đã được giao thành công",
   },
-  CANCELLED: {
+  cancelled: {
     label: "Đã hủy",
     icon: XCircleIcon,
     color: "text-red-600 bg-red-100",
+    description: "Đơn hàng đã được hủy",
   },
 };
 
-interface AdminOrderResponse {
-  success: boolean;
-  message: string;
-  data: OrderResponse;
-}
-
-export default function AdminOrderDetailPage() {
+export default function AccountOrderDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const { user, isAuthenticated } = useAuth();
   const [order, setOrder] = useState<OrderResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [updating, setUpdating] = useState(false);
-  const [editingStatus, setEditingStatus] = useState(false);
 
   const orderId = params.id as string;
 
   useEffect(() => {
+    if (!isAuthenticated || !user?.username) {
+      router.push("/auth/sign-in");
+      return;
+    }
+
     if (orderId) {
       loadOrderDetail();
     }
-  }, [orderId]);
+  }, [isAuthenticated, user?.username, orderId]);
 
   const loadOrderDetail = async () => {
+    if (!user?.username || !orderId) return;
+
     try {
       setLoading(true);
-      // Note: API endpoint might need to be adjusted based on actual backend implementation
-      const response = await api.get<AdminOrderResponse>(
-        `/order/admin/orders/${orderId}`
-      );
+      const response = await orderService.getOrder(orderId, user.username);
 
-      if (response.data.success && response.data.data) {
-        setOrder(response.data.data);
+      if (response.success && response.data) {
+        setOrder(response.data);
       } else {
-        setError(response.data.message || "Không thể tải chi tiết đơn hàng");
+        setError(response.message || "Không thể tải chi tiết đơn hàng");
       }
     } catch (err) {
       console.error("Error loading order detail:", err);
       setError("Có lỗi xảy ra khi tải chi tiết đơn hàng");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const updateOrderStatus = async (newStatus: string) => {
-    if (!order) return;
-
-    try {
-      setUpdating(true);
-      const response = await api.patch(
-        `/order/admin/orders/${orderId}/status`,
-        {
-          status: newStatus,
-        }
-      );
-
-      if (response.data.success) {
-        setOrder((prev) =>
-          prev ? { ...prev, status: newStatus as any } : null
-        );
-        setEditingStatus(false);
-      } else {
-        alert("Không thể cập nhật trạng thái: " + response.data.message);
-      }
-    } catch (err) {
-      console.error("Error updating status:", err);
-      alert("Có lỗi xảy ra khi cập nhật trạng thái");
-    } finally {
-      setUpdating(false);
     }
   };
 
@@ -160,10 +108,14 @@ export default function AdminOrderDetailPage() {
     });
   };
 
+  if (!isAuthenticated) {
+    return null; // Will redirect
+  }
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="container mx-auto px-4 py-8">
+        <div className="max-w-4xl mx-auto">
           <div className="bg-white rounded-lg shadow-sm p-12 text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
             <p className="text-gray-600">Đang tải chi tiết đơn hàng...</p>
@@ -175,18 +127,18 @@ export default function AdminOrderDetailPage() {
 
   if (error || !order) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="container mx-auto px-4 py-8">
+        <div className="max-w-4xl mx-auto">
           <div className="bg-white rounded-lg shadow-sm p-12 text-center">
             <XCircleIcon className="h-16 w-16 text-red-300 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">
               Không thể tải đơn hàng
             </h3>
             <p className="text-gray-600 mb-6">
-              {error || "Đơn hàng không tồn tại"}
+              {error || "Đơn hàng không tồn tại hoặc bạn không có quyền xem"}
             </p>
             <Link
-              href="/admin/orders"
+              href="/account/orders"
               className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
             >
               Quay lại danh sách
@@ -197,18 +149,31 @@ export default function AdminOrderDetailPage() {
     );
   }
 
-  const currentStatus =
-    statusConfig[order.status.toUpperCase() as keyof typeof statusConfig] ||
-    statusConfig.PENDING;
-  const StatusIcon = currentStatus.icon;
+  const status = statusConfig[order.status] || statusConfig.PENDING;
+  const StatusIcon = status.icon;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="container mx-auto px-4 py-8">
+      <div className="max-w-4xl mx-auto">
+        {/* Breadcrumb */}
+        <div className="mb-6">
+          <div className="flex items-center space-x-2 text-sm text-gray-600">
+            <Link href="/account" className="hover:text-gray-900">
+              Tài khoản
+            </Link>
+            <span>/</span>
+            <Link href="/account/orders" className="hover:text-gray-900">
+              Đơn hàng
+            </Link>
+            <span>/</span>
+            <span className="text-gray-900">Chi tiết</span>
+          </div>
+        </div>
+
         {/* Header */}
         <div className="mb-6">
           <Link
-            href="/admin/orders"
+            href="/account/orders"
             className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-4"
           >
             <ArrowLeftIcon className="h-4 w-4 mr-1" />
@@ -227,44 +192,15 @@ export default function AdminOrderDetailPage() {
               </div>
 
               <div className="text-right">
-                {editingStatus ? (
-                  <div className="flex items-center space-x-2">
-                    <select
-                      defaultValue={order.status}
-                      onChange={(e) => updateOrderStatus(e.target.value)}
-                      disabled={updating}
-                      className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500"
-                    >
-                      {statusOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      onClick={() => setEditingStatus(false)}
-                      className="px-2 py-1 text-sm text-gray-600 hover:text-gray-800"
-                    >
-                      Hủy
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex items-center space-x-2">
-                    <span
-                      className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium ${currentStatus.color}`}
-                    >
-                      <StatusIcon className="h-5 w-5 mr-2" />
-                      {currentStatus.label}
-                    </span>
-                    <button
-                      onClick={() => setEditingStatus(true)}
-                      className="p-2 text-gray-400 hover:text-gray-600"
-                      title="Chỉnh sửa trạng thái"
-                    >
-                      <PencilIcon className="h-4 w-4" />
-                    </button>
-                  </div>
-                )}
+                <span
+                  className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium ${status.color}`}
+                >
+                  <StatusIcon className="h-5 w-5 mr-2" />
+                  {status.label}
+                </span>
+                <p className="text-sm text-gray-600 mt-1">
+                  {status.description}
+                </p>
               </div>
             </div>
           </div>
@@ -284,13 +220,11 @@ export default function AdminOrderDetailPage() {
                     key={index}
                     className="flex items-center space-x-4 p-4 border border-gray-200 rounded-lg"
                   >
-                    <div className="relative flex-shrink-0 w-16 h-16 bg-gray-100 rounded-lg overflow-hidden">
+                    <div className="flex-shrink-0 w-16 h-16 bg-gray-100 rounded-lg overflow-hidden">
                       {item.image && (
-                        <Image
+                        <img
                           src={item.image}
                           alt={item.title}
-                          width={64}
-                          height={64}
                           className="w-full h-full object-cover"
                         />
                       )}
@@ -320,7 +254,7 @@ export default function AdminOrderDetailPage() {
                         {formatCurrency(item.price)}
                       </p>
                       <p className="text-sm text-gray-600">
-                        SL: {item.quantity}
+                        Số lượng: {item.quantity}
                       </p>
                       <p
                         className={`text-xs ${
@@ -356,20 +290,6 @@ export default function AdminOrderDetailPage() {
                   </div>
                 )}
 
-                {order.shippingFee && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Phí vận chuyển:</span>
-                    <span>{formatCurrency(order.shippingFee)}</span>
-                  </div>
-                )}
-
-                {order.discount && order.discount > 0 && (
-                  <div className="flex justify-between text-sm text-green-600">
-                    <span>Giảm giá:</span>
-                    <span>-{formatCurrency(order.discount)}</span>
-                  </div>
-                )}
-
                 <div className="border-t pt-3">
                   <div className="flex justify-between text-lg font-semibold">
                     <span>Tổng cộng:</span>
@@ -379,10 +299,10 @@ export default function AdminOrderDetailPage() {
               </div>
             </div>
 
-            {/* Customer Information */}
+            {/* Shipping Information */}
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                Thông tin khách hàng
+                Thông tin giao hàng
               </h2>
 
               <div className="space-y-3">
@@ -392,9 +312,6 @@ export default function AdminOrderDetailPage() {
                     <p className="text-sm font-medium text-gray-900">
                       {order.firstName} {order.lastName}
                     </p>
-                    {order.username && (
-                      <p className="text-xs text-gray-500">@{order.username}</p>
-                    )}
                   </div>
                 </div>
 
@@ -427,40 +344,134 @@ export default function AdminOrderDetailPage() {
               </div>
             </div>
 
-            {/* Order Actions */}
+            {/* Order Timeline */}
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                Thao tác
+                Trạng thái đơn hàng
               </h2>
 
               <div className="space-y-3">
-                <button
-                  onClick={() => window.print()}
-                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
+                <div className="flex items-center space-x-3">
+                  <div className="flex-shrink-0 w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                    <CheckCircleIcon className="h-5 w-5 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">
+                      Đã đặt hàng
+                    </p>
+                    <p className="text-xs text-gray-600">
+                      {formatDate(order.createdAt)}
+                    </p>
+                  </div>
+                </div>
+
+                {order.status !== "PENDING" && (
+                  <div className="flex items-center space-x-3">
+                    <div
+                      className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+                        ["PAID", "SHIPPING", "COMPLETED"].includes(order.status)
+                          ? "bg-green-100"
+                          : "bg-gray-100"
+                      }`}
+                    >
+                      <ClockIcon
+                        className={`h-5 w-5 ${
+                          ["PAID", "SHIPPING", "COMPLETED"].includes(
+                            order.status
+                          )
+                            ? "text-green-600"
+                            : "text-gray-400"
+                        }`}
+                      />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">
+                        Đang xử lý
+                      </p>
+                      {order.updatedAt && (
+                        <p className="text-xs text-gray-600">
+                          {formatDate(order.updatedAt)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {["SHIPPING", "COMPLETED"].includes(order.status) && (
+                  <div className="flex items-center space-x-3">
+                    <div
+                      className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+                        order.status === "COMPLETED"
+                          ? "bg-green-100"
+                          : "bg-blue-100"
+                      }`}
+                    >
+                      <TruckIcon
+                        className={`h-5 w-5 ${
+                          order.status === "COMPLETED"
+                            ? "text-green-600"
+                            : "text-blue-600"
+                        }`}
+                      />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">
+                        Đang giao hàng
+                      </p>
+                      {order.trackingNumber && (
+                        <p className="text-xs text-gray-600">
+                          Mã vận đơn: {order.trackingNumber}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {order.status === "COMPLETED" && (
+                  <div className="flex items-center space-x-3">
+                    <div className="flex-shrink-0 w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                      <CheckCircleIcon className="h-5 w-5 text-green-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">
+                        Đã giao hàng
+                      </p>
+                      {order.estimatedDelivery && (
+                        <p className="text-xs text-gray-600">
+                          {formatDate(order.estimatedDelivery)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Order Actions */}
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                Hành động
+              </h2>
+
+              <div className="space-y-3">
+                <Link
+                  href="/shop"
+                  className="w-full inline-flex justify-center items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
                 >
-                  In đơn hàng
-                </button>
+                  Mua lại sản phẩm
+                </Link>
+
+                {order.status === "PENDING" && (
+                  <button className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium">
+                    Hủy đơn hàng
+                  </button>
+                )}
 
                 <button
-                  onClick={() => {
-                    const subject = encodeURIComponent(
-                      `Đơn hàng #${order._id.slice(-8).toUpperCase()}`
-                    );
-                    const body = encodeURIComponent(
-                      `Xin chào ${order.firstName} ${
-                        order.lastName
-                      },\n\nCảm ơn bạn đã đặt hàng tại cửa hàng chúng tôi.\n\nMã đơn hàng: ${
-                        order._id
-                      }\nTổng tiền: ${formatCurrency(
-                        order.total
-                      )}\n\nTrân trọng!`
-                    );
-                    window.location.href = `mailto:${order.email}?subject=${subject}&body=${body}`;
-                  }}
+                  onClick={() => window.print()}
                   className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-sm font-medium"
-                  disabled={!order.email}
                 >
-                  Gửi email
+                  In đơn hàng
                 </button>
               </div>
             </div>

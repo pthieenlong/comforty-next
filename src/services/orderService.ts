@@ -1,9 +1,17 @@
 import api from "@/lib/axios";
 
 export interface OrderItem {
+  id: string;
   slug: string;
-  quantity: number;
+  title: string;
+  categories: string[];
   price: number;
+  quantity: number;
+  image: string;
+  isSale: boolean;
+  salePercent: number;
+  inStock: boolean;
+  originalPrice?: number;
 }
 
 export interface ShippingInfo {
@@ -40,18 +48,7 @@ export interface CreateOrderRequest {
   address: string;
   phone: string;
   email: string;
-  items: Array<{
-    id: string;
-    slug: string;
-    title: string;
-    categories: string[];
-    price: number;
-    quantity: number;
-    image: string;
-    isSale: boolean;
-    salePercent: number;
-    inStock: boolean;
-  }>;
+  items: OrderItem[];
   total: number;
   subtotal?: number;
   discount?: number;
@@ -62,13 +59,13 @@ export interface CreateOrderRequest {
 export interface OrderResponse {
   _id: string;
   orderId?: string;
-  status: "pending" | "processing" | "shipped" | "delivered" | "cancelled";
+  status: "PENDING" | "PAID" | "SHIPPING" | "COMPLETED" | "cancelled";
   items: OrderItem[];
-  firstName?: string;
-  lastName?: string;
-  address?: string;
-  phone?: string;
-  email?: string;
+  firstName: string;
+  lastName: string;
+  address: string;
+  phone: string;
+  email: string;
   total: number;
   subtotal?: number;
   discount?: number;
@@ -80,11 +77,22 @@ export interface OrderResponse {
   trackingNumber?: string;
 }
 
-export interface OrderHistoryResponse {
-  orders: OrderResponse[];
+export interface ShortOrderResponse {
+  id: string;
+  date: Date;
+  quantity: number;
   total: number;
-  page: number;
-  limit: number;
+  status: "PENDING" | "PAID" | "SHIPPING" | "COMPLETED";
+}
+
+export interface OrderHistoryResponse {
+  data: ShortOrderResponse[];
+  pagination: {
+    limit: number;
+    page: number;
+    totalPage: number;
+    totalItems: number;
+  };
 }
 
 export interface ApiResponse<T> {
@@ -117,7 +125,7 @@ export const orderService = {
     username: string,
     page: number = 1,
     limit: number = 10
-  ): Promise<ApiResponse<OrderHistoryResponse>> {
+  ): Promise<ApiResponse<ShortOrderResponse[]>> {
     const response = await api.get(`/order/${username}?page=${page}`);
     return response.data;
   },
