@@ -51,14 +51,13 @@ function ShopPageContent() {
         setLoading(true);
         setError("");
 
-        // Build query parameters
         const params = new URLSearchParams();
         if (filters.category) params.append("category", filters.category);
         if (filters.search) params.append("search", filters.search);
 
         const endpoint = params.toString()
           ? `/product?${params.toString()}`
-          : "/product"
+          : "/product";
         const response = await api.get<ApiResponse>(endpoint);
 
         if (response.data.success) {

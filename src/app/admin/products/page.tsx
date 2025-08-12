@@ -3,9 +3,17 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
-import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
+import {
+  MagnifyingGlassIcon,
+  PencilIcon,
+  TrashIcon,
+  ExclamationTriangleIcon,
+} from "@heroicons/react/24/outline";
 import api from "@/lib/axios";
 import { IShortProductResponse } from "@/common/types/types";
+import { categoryService } from "@/services/categoryService";
+import { ICategory } from "@/common/types/types";
+
 interface ApiResponse {
   httpCode: number;
   success: boolean;
@@ -13,12 +21,18 @@ interface ApiResponse {
   data: IShortProductResponse[];
 }
 
-const CATEGORIES = ["Ghế", "Bàn", "Tủ", "Sofa", "Giường", "Kệ"];
-
 export default function ProductsPage() {
   const [products, setProducts] = useState<IShortProductResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
+  const [categories, setCategories] = useState<ICategory[]>([]);
+
+  // Delete modal states
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [productToDelete, setProductToDelete] =
+    useState<IShortProductResponse | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string>("");
 
   const [query, setQuery] = useState("");
   const [visibility, setVisibility] = useState<"visible" | "hidden" | "">("");
@@ -27,7 +41,6 @@ export default function ProductsPage() {
   const [priceMax, setPriceMax] = useState<string>("");
   const [saleFilter, setSaleFilter] = useState<"sale" | "no-sale" | "">("");
 
-  // Fetch products từ API
   useEffect(() => {
     const fetchProducts = async () => {
       try {
@@ -37,10 +50,13 @@ export default function ProductsPage() {
         const response = await api.get<ApiResponse>("/product");
 
         if (response.data.success && response.data.httpCode === 200) {
-          // Chuyển đổi createdAt từ string sang Date nếu cần
           const productsWithDate = response.data.data.map((product) => ({
             ...product,
             createdAt: new Date(product.createdAt),
+            // Thêm updatedAt nếu có trong response
+            updatedAt: product.updatedAt
+              ? new Date(product.updatedAt)
+              : new Date(product.createdAt),
           }));
           setProducts(productsWithDate);
         } else {
@@ -61,131 +77,139 @@ export default function ProductsPage() {
     };
 
     fetchProducts();
+    fetchCategories();
   }, []);
 
-  const filtered = useMemo(() => {
-    const minP = priceMin ? Number(priceMin) : undefined;
-    const maxP = priceMax ? Number(priceMax) : undefined;
+  const fetchCategories = async () => {
+    try {
+      const response = await categoryService.getAllCategories();
+      if (response.success && response.data) {
+        setCategories(response.data);
+      }
+    } catch (error) {
+      console.error("Error fetching categories:", error);
+    }
+  };
 
-    return products.filter((p) => {
-      const matchTitle = p.title.toLowerCase().includes(query.toLowerCase());
-      const matchVisibility = visibility
-        ? visibility === "visible"
-          ? p.isVisible
-          : !p.isVisible
+  // Delete functions
+  const handleDeleteClick = (product: IShortProductResponse) => {
+    setProductToDelete(product);
+    setShowDeleteModal(true);
+    setDeleteError("");
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!productToDelete) return;
+
+    try {
+      setDeleting(true);
+      setDeleteError("");
+
+      const response = await api.delete(`/product/${productToDelete.slug}`);
+
+      if (response.data.success) {
+        // Remove product from list
+        setProducts((prev) => prev.filter((p) => p.id !== productToDelete.id));
+        setShowDeleteModal(false);
+        setProductToDelete(null);
+      } else {
+        setDeleteError(response.data.message || "Không thể xóa sản phẩm");
+      }
+    } catch (err: any) {
+      console.error("Error deleting product:", err);
+      setDeleteError(
+        err.response?.data?.message || "Có lỗi xảy ra khi xóa sản phẩm"
+      );
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setShowDeleteModal(false);
+    setProductToDelete(null);
+    setDeleteError("");
+  };
+
+  const filtered = useMemo(() => {
+    return products.filter((product) => {
+      const matchesQuery = query
+        ? product.title.toLowerCase().includes(query.toLowerCase())
         : true;
-      const matchCategory = category ? p.categories.includes(category) : true;
-      const matchPriceMin = minP !== undefined ? p.price >= minP : true;
-      const matchPriceMax = maxP !== undefined ? p.price <= maxP : true;
-      const matchSale = saleFilter
+
+      const matchesVisibility = visibility
+        ? visibility === "visible"
+          ? product.isVisible
+          : !product.isVisible
+        : true;
+
+      const matchesCategory = category
+        ? product.categories.some((cat) =>
+            cat.toLowerCase().includes(category.toLowerCase())
+          )
+        : true;
+
+      const matchesPriceMin = priceMin
+        ? product.price >= parseFloat(priceMin)
+        : true;
+      const matchesPriceMax = priceMax
+        ? product.price <= parseFloat(priceMax)
+        : true;
+
+      const matchesSale = saleFilter
         ? saleFilter === "sale"
-          ? p.isSale
-          : !p.isSale
+          ? product.isSale
+          : !product.isSale
         : true;
 
       return (
-        matchTitle &&
-        matchVisibility &&
-        matchCategory &&
-        matchPriceMin &&
-        matchPriceMax &&
-        matchSale
+        matchesQuery &&
+        matchesVisibility &&
+        matchesCategory &&
+        matchesPriceMin &&
+        matchesPriceMax &&
+        matchesSale
       );
     });
   }, [products, query, visibility, category, priceMin, priceMax, saleFilter]);
-
-  const clearFilters = () => {
-    setQuery("");
-    setVisibility("");
-    setCategory("");
-    setPriceMin("");
-    setPriceMax("");
-    setSaleFilter("");
-  };
 
   const formatDate = (date: Date) => {
     return new Intl.DateTimeFormat("vi-VN", {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     }).format(date);
   };
 
-  const refreshProducts = async () => {
-    try {
-      setLoading(true);
-      const response = await api.get<ApiResponse>("/products");
-
-      if (response.data.success && response.data.httpCode === 200) {
-        const productsWithDate = response.data.data.map((product) => ({
-          ...product,
-          createdAt: new Date(product.createdAt),
-        }));
-        setProducts(productsWithDate);
-        setError("");
-      }
-    } catch {
-      setError("Có lỗi xảy ra khi tải lại danh sách sản phẩm");
-    } finally {
-      setLoading(false);
-    }
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat("vi-VN", {
+      style: "currency",
+      currency: "VND",
+    }).format(price);
   };
 
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl md:text-2xl font-semibold">
-              Tất cả sản phẩm
-            </h1>
-            <p className="text-sm text-neutral-500">
-              Quản lý danh sách sản phẩm
-            </p>
+            <div className="h-8 w-48 bg-neutral-200 animate-pulse rounded"></div>
+            <div className="h-4 w-64 bg-neutral-200 animate-pulse rounded mt-2"></div>
           </div>
+          <div className="h-10 w-32 bg-neutral-200 animate-pulse rounded"></div>
         </div>
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-neutral-900"></div>
-          <span className="ml-2 text-neutral-600">Đang tải dữ liệu...</span>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl md:text-2xl font-semibold">
-              Tất cả sản phẩm
-            </h1>
-            <p className="text-sm text-neutral-500">
-              Quản lý danh sách sản phẩm
-            </p>
-          </div>
-        </div>
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4">
-          <div className="flex items-center gap-3">
-            <div className="text-red-600">
-              <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                <path
-                  fillRule="evenodd"
-                  d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                  clipRule="evenodd"
-                />
-              </svg>
+        <div className="rounded-xl border border-neutral-200 bg-white">
+          <div className="p-6">
+            <div className="space-y-4">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div
+                  key={i}
+                  className="h-16 bg-neutral-100 animate-pulse rounded"
+                ></div>
+              ))}
             </div>
-            <div>
-              <p className="text-red-800 font-medium">Lỗi tải dữ liệu</p>
-              <p className="text-red-700 text-sm">{error}</p>
-            </div>
-            <button
-              onClick={refreshProducts}
-              className="ml-auto px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700"
-            >
-              Thử lại
-            </button>
           </div>
         </div>
       </div>
@@ -194,198 +218,205 @@ export default function ProductsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl md:text-2xl font-semibold">Tất cả sản phẩm</h1>
+          <h1 className="text-xl md:text-2xl font-semibold">Sản phẩm</h1>
           <p className="text-sm text-neutral-500">
-            Quản lý danh sách sản phẩm ({filtered.length}/{products.length})
+            Quản lý danh sách sản phẩm ({filtered.length} sản phẩm)
           </p>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={refreshProducts}
-            className="inline-flex items-center justify-center rounded-md border border-neutral-200 text-neutral-700 text-sm px-3 py-2 hover:bg-neutral-50"
+        <Link
+          href="/admin/products/new"
+          className="inline-flex items-center justify-center rounded-md bg-neutral-900 text-white text-sm px-4 py-2 hover:bg-neutral-800"
+        >
+          Thêm sản phẩm
+        </Link>
+      </div>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
+          {error}
+        </div>
+      )}
+
+      {/* Filters */}
+      <div className="rounded-xl border border-neutral-200 bg-white p-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+          <div className="relative">
+            <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-neutral-400" />
+            <input
+              type="text"
+              placeholder="Tìm kiếm sản phẩm..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="w-full pl-10 pr-3 py-2 rounded-md border border-neutral-200 focus:ring-2 focus:ring-neutral-900/10 outline-none text-sm"
+            />
+          </div>
+
+          <select
+            value={visibility}
+            onChange={(e) => setVisibility(e.target.value as any)}
+            className="px-3 py-2 rounded-md border border-neutral-200 focus:ring-2 focus:ring-neutral-900/10 outline-none text-sm"
           >
-            Làm mới
-          </button>
-          <Link
-            href="/admin/products/new"
-            className="inline-flex items-center justify-center rounded-md bg-neutral-900 text-white text-sm px-3 py-2 hover:bg-neutral-800"
+            <option value="">Tất cả trạng thái</option>
+            <option value="visible">Hiển thị</option>
+            <option value="hidden">Ẩn</option>
+          </select>
+
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className="px-3 py-2 rounded-md border border-neutral-200 focus:ring-2 focus:ring-neutral-900/10 outline-none text-sm"
           >
-            Thêm sản phẩm
-          </Link>
+            <option value="">Tất cả danh mục</option>
+            {categories.map((cat) => (
+              <option key={cat.id} value={cat.name}>
+                {cat.name}
+              </option>
+            ))}
+          </select>
+
+          <input
+            type="number"
+            placeholder="Giá từ"
+            value={priceMin}
+            onChange={(e) => setPriceMin(e.target.value)}
+            className="px-3 py-2 rounded-md border border-neutral-200 focus:ring-2 focus:ring-neutral-900/10 outline-none text-sm"
+          />
+
+          <input
+            type="number"
+            placeholder="Giá đến"
+            value={priceMax}
+            onChange={(e) => setPriceMax(e.target.value)}
+            className="px-3 py-2 rounded-md border border-neutral-200 focus:ring-2 focus:ring-neutral-900/10 outline-none text-sm"
+          />
+
+          <select
+            value={saleFilter}
+            onChange={(e) => setSaleFilter(e.target.value as any)}
+            className="px-3 py-2 rounded-md border border-neutral-200 focus:ring-2 focus:ring-neutral-900/10 outline-none text-sm"
+          >
+            <option value="">Tất cả khuyến mãi</option>
+            <option value="sale">Đang khuyến mãi</option>
+            <option value="no-sale">Không khuyến mãi</option>
+          </select>
         </div>
       </div>
 
+      {/* Products Table */}
       <div className="rounded-xl border border-neutral-200 bg-white overflow-hidden">
-        <div className="p-3 border-b border-neutral-200 grid grid-cols-1 gap-2 md:grid-cols-12 md:items-end">
-          <div className="relative md:col-span-3">
-            <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 size-5 text-neutral-400" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Tìm theo tên sản phẩm..."
-              className="w-full pl-10 pr-3 py-2 text-sm rounded-md border border-neutral-200 focus:ring-2 focus:ring-neutral-900/10 outline-none"
-            />
-          </div>
-          <div className="md:col-span-2">
-            <label className="block text-xs text-neutral-500 mb-1">
-              Hiển thị
-            </label>
-            <select
-              value={visibility}
-              onChange={(e) =>
-                setVisibility(e.target.value as "visible" | "hidden" | "")
-              }
-              className="w-full px-3 py-2 text-sm rounded-md border border-neutral-200 focus:ring-2 focus:ring-neutral-900/10 outline-none"
-            >
-              <option value="">Tất cả</option>
-              <option value="visible">Hiển thị</option>
-              <option value="hidden">Ẩn</option>
-            </select>
-          </div>
-          <div className="md:col-span-2">
-            <label className="block text-xs text-neutral-500 mb-1">
-              Danh mục
-            </label>
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="w-full px-3 py-2 text-sm rounded-md border border-neutral-200 focus:ring-2 focus:ring-neutral-900/10 outline-none"
-            >
-              <option value="">Tất cả</option>
-              {CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="md:col-span-2 grid grid-cols-2 gap-2">
-            <div>
-              <label className="block text-xs text-neutral-500 mb-1">
-                Giá từ
-              </label>
-              <input
-                type="number"
-                value={priceMin}
-                onChange={(e) => setPriceMin(e.target.value)}
-                className="w-full px-3 py-2 text-sm rounded-md border border-neutral-200 focus:ring-2 focus:ring-neutral-900/10 outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-neutral-500 mb-1">đến</label>
-              <input
-                type="number"
-                value={priceMax}
-                onChange={(e) => setPriceMax(e.target.value)}
-                className="w-full px-3 py-2 text-sm rounded-md border border-neutral-200 focus:ring-2 focus:ring-neutral-900/10 outline-none"
-              />
-            </div>
-          </div>
-          <div className="md:col-span-2">
-            <label className="block text-xs text-neutral-500 mb-1">
-              Khuyến mãi
-            </label>
-            <select
-              value={saleFilter}
-              onChange={(e) =>
-                setSaleFilter(e.target.value as "sale" | "no-sale" | "")
-              }
-              className="w-full px-3 py-2 text-sm rounded-md border border-neutral-200 focus:ring-2 focus:ring-neutral-900/10 outline-none"
-            >
-              <option value="">Tất cả</option>
-              <option value="sale">Có khuyến mãi</option>
-              <option value="no-sale">Không khuyến mãi</option>
-            </select>
-          </div>
-          <div className="md:col-span-1 flex md:justify-end">
-            <button
-              type="button"
-              onClick={clearFilters}
-              className="h-9 px-3 rounded-md text-sm border border-neutral-200 hover:bg-neutral-50"
-            >
-              Xóa lọc
-            </button>
-          </div>
-        </div>
         <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead className="bg-neutral-50 text-neutral-600">
+          <table className="w-full table-fixed">
+            <thead className="bg-neutral-50 border-b border-neutral-200">
               <tr>
-                <th className="text-left font-medium px-4 py-3">ID</th>
-                <th className="text-left font-medium px-4 py-3">Sản phẩm</th>
-                <th className="text-left font-medium px-4 py-3">Giá</th>
-                <th className="text-left font-medium px-4 py-3">Danh mục</th>
-                <th className="text-left font-medium px-4 py-3">Trạng thái</th>
-                <th className="text-left font-medium px-4 py-3">Ngày tạo</th>
-                <th className="text-right font-medium px-4 py-3">Hành động</th>
+                <th className="w-[300px] px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                  Sản phẩm
+                </th>
+                <th className="w-[140px] px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                  Giá
+                </th>
+                <th className="w-[160px] px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                  Danh mục
+                </th>
+                <th className="w-[120px] px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                  Trạng thái
+                </th>
+                <th className="w-[130px] px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                  Tạo lúc
+                </th>
+                <th className="w-[130px] px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                  Cập nhật
+                </th>
+                <th className="w-[100px] px-4 py-3 text-center text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                  Thao tác
+                </th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-neutral-200">
               {filtered.length > 0 ? (
                 filtered.map((p) => (
-                  <tr
-                    key={p.id}
-                    className="border-t border-neutral-100 hover:bg-neutral-50/60"
-                  >
-                    <td className="px-4 py-3">#{p.id}</td>
+                  <tr key={p.id} className="hover:bg-neutral-50">
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="relative size-11 overflow-hidden rounded-md border border-neutral-200 bg-neutral-50 min-w-14 max-w-20">
-                          <Image
-                            alt={p.title}
-                            src={p.image}
-                            fill
-                            className="object-contain p-1.5"
-                          />
+                      <div className="flex items-center gap-3 w-full">
+                        <div className="flex-shrink-0 w-12 h-12 bg-neutral-100 rounded-md overflow-hidden">
+                          {p.image ? (
+                            <Image
+                              src={p.image}
+                              alt={p.title}
+                              width={48}
+                              height={48}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-neutral-200 flex items-center justify-center text-neutral-400 text-xs">
+                              N/A
+                            </div>
+                          )}
                         </div>
-                        <div>
-                          <Link
-                            href={`/admin/products/${p.slug}`}
-                            className="text-indigo-700 hover:underline"
+                        <div className="flex-1 min-w-0">
+                          <h3
+                            className="text-sm font-medium text-neutral-900 truncate"
+                            title={p.title}
                           >
                             {p.title}
-                          </Link>
-                          <div className="text-xs text-neutral-500">
-                            Slug: {p.slug}
-                          </div>
+                          </h3>
+                          <p className="text-xs text-neutral-500 truncate">
+                            ID: {p.id}
+                          </p>
                         </div>
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <div>
-                        <div
-                          className={`${
-                            p.isSale ? "line-through text-neutral-400" : ""
-                          }`}
-                        >
-                          ₫ {p.price.toLocaleString("vi-VN")}
-                        </div>
-                        {p.isSale && (
-                          <div className="text-red-600 font-medium">
-                            ₫{" "}
-                            {(
-                              p.price *
-                              (1 - p.salePercent / 100)
-                            ).toLocaleString("vi-VN")}
-                            <span className="ml-1 text-xs bg-red-100 text-red-800 px-1 py-0.5 rounded">
+                      <div className="text-sm">
+                        {p.isSale && p.salePercent > 0 ? (
+                          <div className="space-y-1">
+                            <div className="text-neutral-900 font-medium text-xs">
+                              {formatPrice(p.price * (1 - p.salePercent / 100))}
+                            </div>
+                            <div className="text-xs text-neutral-500 line-through">
+                              {formatPrice(p.price)}
+                            </div>
+                            <span className="inline-flex items-center rounded-full bg-red-100 text-red-800 px-1.5 py-0.5 text-xs">
                               -{p.salePercent}%
                             </span>
+                          </div>
+                        ) : (
+                          <div className="text-neutral-900 font-medium text-sm">
+                            {formatPrice(p.price)}
                           </div>
                         )}
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-1">
-                        {p.categories.map((cat, idx) => (
-                          <span
-                            key={idx}
-                            className="inline-flex items-center rounded-full bg-blue-100 text-blue-800 px-2 py-0.5 text-xs"
-                          >
-                            {cat}
+                      <div className="flex flex-col gap-1">
+                        {p.categories && p.categories.length > 0 ? (
+                          <>
+                            {/* Hiển thị category đầu tiên */}
+                            <span
+                              className="inline-flex items-center rounded-full bg-blue-100 text-blue-800 px-2 py-0.5 text-xs w-fit max-w-full truncate"
+                              title={p.categories[0]}
+                            >
+                              {p.categories[0]}
+                            </span>
+
+                            {/* Hiển thị indicator nếu có nhiều hơn 1 category */}
+                            {p.categories.length > 1 && (
+                              <span
+                                className="inline-flex items-center rounded-full bg-neutral-100 text-neutral-600 px-2 py-0.5 text-xs cursor-help w-fit"
+                                title={`Tất cả danh mục: ${p.categories.join(
+                                  ", "
+                                )}`}
+                              >
+                                +{p.categories.length - 1} khác
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          <span className="text-xs text-neutral-400 italic">
+                            Chưa có
                           </span>
-                        ))}
+                        )}
                       </div>
                     </td>
                     <td className="px-4 py-3">
@@ -401,21 +432,55 @@ export default function ProductsPage() {
                         </span>
                         {p.isSale && (
                           <span className="inline-flex items-center rounded-full bg-orange-100 text-orange-800 px-2 py-0.5 text-xs w-fit">
-                            Khuyến mãi
+                            Sale
                           </span>
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-xs text-neutral-600">
-                      {formatDate(p.createdAt)}
+                    <td className="px-4 py-3">
+                      <div className="text-xs text-neutral-600">
+                        <div>{formatDate(p.createdAt).split(", ")[0]}</div>
+                        <div className="text-neutral-500">
+                          {formatDate(p.createdAt).split(", ")[1]}
+                        </div>
+                      </div>
                     </td>
-                    <td className="px-4 py-3 text-right">
-                      <Link
-                        href={`/admin/products/${p.id}`}
-                        className="text-neutral-700 hover:text-neutral-900"
-                      >
-                        Sửa
-                      </Link>
+                    <td className="px-4 py-3">
+                      <div className="text-xs text-neutral-600">
+                        {p.updatedAt ? (
+                          <>
+                            <div>{formatDate(p.updatedAt).split(", ")[0]}</div>
+                            <div className="text-neutral-500">
+                              {formatDate(p.updatedAt).split(", ")[1]}
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div>{formatDate(p.createdAt).split(", ")[0]}</div>
+                            <div className="text-neutral-500">
+                              {formatDate(p.createdAt).split(", ")[1]}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <Link
+                          href={`/admin/products/${p.slug}`}
+                          className="inline-flex items-center justify-center w-8 h-8 rounded-md text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 transition-colors"
+                          title="Chỉnh sửa sản phẩm"
+                        >
+                          <PencilIcon className="w-4 h-4" />
+                        </Link>
+                        <button
+                          onClick={() => handleDeleteClick(p)}
+                          className="inline-flex items-center justify-center w-8 h-8 rounded-md text-red-600 hover:text-red-900 hover:bg-red-50 transition-colors"
+                          title="Xóa sản phẩm"
+                        >
+                          <TrashIcon className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -435,6 +500,80 @@ export default function ProductsPage() {
           </table>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="flex-shrink-0 w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                <ExclamationTriangleIcon className="w-6 h-6 text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-medium text-gray-900">
+                  Xác nhận xóa sản phẩm
+                </h3>
+                <p className="text-sm text-gray-500">
+                  Hành động này không thể hoàn tác
+                </p>
+              </div>
+            </div>
+
+            {productToDelete && (
+              <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex-shrink-0 w-12 h-12 bg-neutral-100 rounded-md overflow-hidden">
+                    {productToDelete.image ? (
+                      <Image
+                        src={productToDelete.image}
+                        alt={productToDelete.title}
+                        width={48}
+                        height={48}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-neutral-200 flex items-center justify-center text-neutral-400 text-xs">
+                        N/A
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-gray-900">
+                      {productToDelete.title}
+                    </h4>
+                    <p className="text-sm text-gray-500">
+                      ID: {productToDelete.id}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {deleteError && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md mb-4">
+                {deleteError}
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-3">
+              <button
+                onClick={handleDeleteCancel}
+                disabled={deleting}
+                className="px-4 py-2 text-sm text-gray-700 border border-gray-200 rounded-md hover:bg-gray-50 disabled:opacity-50"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleDeleteConfirm}
+                disabled={deleting}
+                className="px-4 py-2 text-sm text-white bg-red-600 rounded-md hover:bg-red-700 disabled:opacity-50"
+              >
+                {deleting ? "Đang xóa..." : "Xóa sản phẩm"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

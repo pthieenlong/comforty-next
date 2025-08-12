@@ -19,13 +19,13 @@ const heroSlides = [
   },
   {
     id: 2,
-    title: "Thiết Kế Thanh Lch",
+    title: "Thiết Kế Thanh Lịch",
     subtitle: "Chế Tác Với Độ Chính Xác Cao",
     description:
       "Mỗi sản phẩm đều được chế tác cẩn thận để mang lại sự thanh lịch và tiện ích cho ngôi nhà của bạn.",
     image: "/banners/decoration-2.jpg",
     buttonText: "Khám phá bộ sưu tập",
-    buttonLink: "/shop?category=chairs",
+    buttonLink: "/shop?category=ghe",
     backgroundColor: "bg-gradient-to-r from-gray-800 to-gray-900",
   },
   {

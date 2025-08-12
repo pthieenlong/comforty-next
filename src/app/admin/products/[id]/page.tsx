@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useEffect, useState, useRef } from "react";
 import Image from "next/image";
 import api from "@/lib/axios";
-import { IProductResponse } from "@/common/types/types";
+import { IProductResponse, ICategory } from "@/common/types/types";
+import { categoryService } from "@/services/categoryService";
 
 interface ApiResponse {
   httpCode: number;
@@ -28,19 +29,21 @@ interface UpdateProductData {
 
 export default function ProductDetailPage() {
   const params = useParams<{ id: string }>();
-  // const router = useRouter(); // TODO: Use for navigation after updates
-  // params.id chính là slug trong trường hợp này (do Next.js routing)
   const productSlug = params?.id;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
-  const [uploading, setUploading] = useState(false);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [error, setError] = useState<string>("");
   const [product, setProduct] = useState<IProductResponse | null>(null);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
 
-  // Form states
+  // Available categories từ database
+  const [availableCategories, setAvailableCategories] = useState<ICategory[]>(
+    []
+  );
+
   const [formData, setFormData] = useState({
     title: "",
     price: 0,
@@ -53,6 +56,35 @@ export default function ProductDetailPage() {
     longDesc: "",
   });
 
+  const [newImageFiles, setNewImageFiles] = useState<File[]>([]);
+  const [newImagePreviews, setNewImagePreviews] = useState<string[]>([]);
+
+  // Fetch available categories
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        setCategoriesLoading(true);
+        const response = await categoryService.getAllCategories();
+
+        if (response.success && response.data) {
+          // Chỉ lấy categories visible
+          const visibleCategories = response.data.filter(
+            (cat) => cat.isVisible
+          );
+          setAvailableCategories(visibleCategories);
+        } else {
+          console.error("Failed to fetch categories:", response.message);
+        }
+      } catch (error) {
+        console.error("Error fetching categories:", error);
+      } finally {
+        setCategoriesLoading(false);
+      }
+    };
+
+    fetchCategories();
+  }, []);
+
   useEffect(() => {
     const fetchProduct = async () => {
       if (!productSlug) return;
@@ -61,7 +93,6 @@ export default function ProductDetailPage() {
         setLoading(true);
         setError("");
 
-        // Fetch bằng slug
         const response = await api.get<ApiResponse>(`/product/${productSlug}`);
 
         if (response.data.success && response.data.httpCode === 200) {
@@ -72,11 +103,10 @@ export default function ProductDetailPage() {
           };
           setProduct(productWithDate);
 
-          // Populate form data
           setFormData({
             title: productWithDate.title,
             price: productWithDate.price,
-            categories: productWithDate.category,
+            categories: productWithDate.category, // product.category → formData.categories
             images: productWithDate.images,
             isSale: productWithDate.isSale,
             isVisible: productWithDate.isVisible,
@@ -130,13 +160,29 @@ export default function ProductDetailPage() {
     }
   };
 
-  const handleCategoryAdd = (category: string) => {
-    if (category && !formData.categories.includes(category)) {
-      setFormData((prev) => ({
-        ...prev,
-        categories: [...prev.categories, category],
-      }));
+  // Improved category add with validation
+  const handleCategoryAdd = (categoryName: string) => {
+    if (!categoryName) return;
+
+    // Check if category exists and is visible
+    const categoryExists = availableCategories.find(
+      (cat) => cat.name === categoryName
+    );
+    if (!categoryExists) {
+      alert("Danh mục không tồn tại hoặc đã bị ẩn");
+      return;
     }
+
+    // Check if already added
+    if (formData.categories.includes(categoryName)) {
+      alert("Danh mục đã được thêm");
+      return;
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      categories: [...prev.categories, categoryName],
+    }));
   };
 
   const handleCategoryRemove = (categoryToRemove: string) => {
@@ -146,54 +192,59 @@ export default function ProductDetailPage() {
     }));
   };
 
-  const handleImageUpload = async (files: FileList | null) => {
-    if (!files || files.length === 0) return;
+  // Custom category input (for adding categories not in the list)
+  const [customCategoryInput, setCustomCategoryInput] = useState("");
 
-    setUploading(true);
-    try {
-      const uploadPromises = Array.from(files).map(async (file) => {
-        const formData = new FormData();
-        formData.append("image", file);
+  const handleCustomCategoryAdd = () => {
+    const trimmedCategory = customCategoryInput.trim();
+    if (!trimmedCategory) return;
 
-        // Giả sử bạn có endpoint upload image
-        const response = await api.post("/upload/image", formData, {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        });
-
-        if (response.data.success) {
-          return response.data.data.url; // URL của hình ảnh đã upload
-        }
-        throw new Error("Upload failed");
-      });
-
-      const uploadedUrls = await Promise.all(uploadPromises);
-
-      setFormData((prev) => ({
-        ...prev,
-        images: [...prev.images, ...uploadedUrls],
-      }));
-
-      alert(`Đã upload ${uploadedUrls.length} hình ảnh thành công!`);
-    } catch (error) {
-      console.error("Upload error:", error);
-      alert("Có lỗi xảy ra khi upload hình ảnh");
-    } finally {
-      setUploading(false);
+    // Check if already exists
+    if (formData.categories.includes(trimmedCategory)) {
+      alert("Danh mục đã được thêm");
+      setCustomCategoryInput("");
+      return;
     }
+
+    // Add custom category
+    setFormData((prev) => ({
+      ...prev,
+      categories: [...prev.categories, trimmedCategory],
+    }));
+
+    setCustomCategoryInput("");
   };
 
-  const handleImageRemove = (indexToRemove: number) => {
+  const handleImageSelect = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+
+    const fileArray = Array.from(files);
+    setNewImageFiles((prev) => [...prev, ...fileArray]);
+
+    const previewUrls = fileArray.map((file) => URL.createObjectURL(file));
+    setNewImagePreviews((prev) => [...prev, ...previewUrls]);
+  };
+
+  const handleExistingImageRemove = (indexToRemove: number) => {
     setFormData((prev) => ({
       ...prev,
       images: prev.images.filter((_, index) => index !== indexToRemove),
     }));
 
-    // Reset active image index if needed
     if (activeImageIndex >= formData.images.length - 1) {
       setActiveImageIndex(0);
     }
+  };
+
+  const handleNewImageRemove = (indexToRemove: number) => {
+    setNewImageFiles((prev) =>
+      prev.filter((_, index) => index !== indexToRemove)
+    );
+
+    URL.revokeObjectURL(newImagePreviews[indexToRemove]);
+    setNewImagePreviews((prev) =>
+      prev.filter((_, index) => index !== indexToRemove)
+    );
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -202,25 +253,39 @@ export default function ProductDetailPage() {
 
     setUpdating(true);
     try {
-      // Prepare update data according to UpdateProductDTO
-      const updateData: UpdateProductData = {
-        title: formData.title,
-        price: formData.price,
-        categories: formData.categories, // Note: API expects 'categories' not 'category'
-        images: formData.images,
-        isSale: formData.isSale,
-        isVisible: formData.isVisible,
-        salePercent: formData.salePercent,
-        shortDesc: formData.shortDesc,
-        longDesc: formData.longDesc,
-      };
+      const submitFormData = new FormData();
 
-      // Update bằng slug
-      const response = await api.patch(`/product/${productSlug}`, updateData);
+      submitFormData.append("title", formData.title);
+      submitFormData.append("price", formData.price.toString());
+      submitFormData.append("categories", JSON.stringify(formData.categories));
+      submitFormData.append("existingImages", JSON.stringify(formData.images));
+      submitFormData.append("isSale", formData.isSale.toString());
+      submitFormData.append("isVisible", formData.isVisible.toString());
+      submitFormData.append("salePercent", formData.salePercent.toString());
+      submitFormData.append("shortDesc", formData.shortDesc);
+      submitFormData.append("longDesc", formData.longDesc);
+
+      newImageFiles.forEach((file, index) => {
+        submitFormData.append(`images`, file);
+      });
+
+      const response = await api.patch(
+        `/product/${productSlug}`,
+        submitFormData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
 
       if (response.data.success) {
         alert("Cập nhật sản phẩm thành công!");
-        // Refresh product data by fetching again
+
+        setNewImageFiles([]);
+        newImagePreviews.forEach((url) => URL.revokeObjectURL(url));
+        setNewImagePreviews([]);
+
         const updatedProduct = await api.get<ApiResponse>(
           `/product/${productSlug}`
         );
@@ -231,6 +296,11 @@ export default function ProductDetailPage() {
             updatedAt: new Date(updatedProduct.data.data.updatedAt),
           };
           setProduct(productWithDate);
+
+          setFormData((prev) => ({
+            ...prev,
+            images: productWithDate.images,
+          }));
         }
       } else {
         alert(response.data.message || "Có lỗi xảy ra khi cập nhật sản phẩm");
@@ -253,7 +323,6 @@ export default function ProductDetailPage() {
     if (!productSlug) return;
 
     try {
-      // Sử dụng slug cho quick toggle endpoints
       const endpoint =
         action === "sale"
           ? `/product/sale/${productSlug}`
@@ -261,14 +330,12 @@ export default function ProductDetailPage() {
       const response = await api.patch(endpoint);
 
       if (response.data.success) {
-        // Update local state
         if (action === "sale") {
           setFormData((prev) => ({ ...prev, isSale: !prev.isSale }));
         } else {
           setFormData((prev) => ({ ...prev, isVisible: !prev.isVisible }));
         }
 
-        // Update product state as well
         if (product) {
           setProduct((prev) =>
             prev
@@ -529,7 +596,6 @@ export default function ProductDetailPage() {
         onSubmit={handleSubmit}
         className="grid grid-cols-1 lg:grid-cols-3 gap-6"
       >
-        {/* ... rest of the form remains the same ... */}
         <div className="lg:col-span-2 space-y-4">
           {/* Thông tin cơ bản */}
           <div className="rounded-xl border border-neutral-200 bg-white p-4 space-y-4">
@@ -591,46 +657,121 @@ export default function ProductDetailPage() {
               </div>
             )}
 
+            {/* IMPROVED CATEGORY SECTION */}
             <div>
               <label className="block text-sm text-neutral-600 mb-1">
                 Danh mục
-              </label>
-              <div className="flex flex-wrap gap-2 mb-2">
-                {formData.categories.map((cat, index) => (
-                  <span
-                    key={index}
-                    className="inline-flex items-center rounded-full bg-blue-100 text-blue-800 px-2 py-0.5 text-xs"
-                  >
-                    {cat}
-                    <button
-                      type="button"
-                      onClick={() => handleCategoryRemove(cat)}
-                      className="ml-1 text-blue-600 hover:text-blue-800"
-                    >
-                      ×
-                    </button>
+                {categoriesLoading && (
+                  <span className="ml-2 text-xs text-neutral-400">
+                    (Đang tải...)
                   </span>
-                ))}
+                )}
+              </label>
+
+              {/* Current categories display */}
+              <div className="flex flex-wrap gap-2 mb-3">
+                {formData.categories.map((cat, index) => {
+                  // Check if this category exists in available categories
+                  const isValidCategory = availableCategories.some(
+                    (availCat) => availCat.name === cat
+                  );
+
+                  return (
+                    <span
+                      key={index}
+                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs ${
+                        isValidCategory
+                          ? "bg-blue-100 text-blue-800"
+                          : "bg-yellow-100 text-yellow-800"
+                      }`}
+                      title={
+                        isValidCategory
+                          ? "Danh mục hợp lệ"
+                          : "Danh mục tùy chỉnh"
+                      }
+                    >
+                      {cat}
+                      {!isValidCategory && (
+                        <span className="ml-1 text-xs">⚠</span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleCategoryRemove(cat)}
+                        className={`ml-1 hover:${
+                          isValidCategory ? "text-blue-800" : "text-yellow-800"
+                        }`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  );
+                })}
               </div>
-              <select
-                onChange={(e) => {
-                  if (e.target.value) {
-                    handleCategoryAdd(e.target.value);
-                    e.target.value = "";
-                  }
-                }}
-                className="w-full px-3 py-2 rounded-md border border-neutral-200 focus:ring-2 focus:ring-neutral-900/10 outline-none"
-              >
-                <option value="">Chọn danh mục để thêm</option>
-                <option value="Ghế">Ghế</option>
-                <option value="Bàn">Bàn</option>
-                <option value="Tủ">Tủ</option>
-                <option value="Sofa">Sofa</option>
-                <option value="Giường">Giường</option>
-                <option value="Kệ">Kệ</option>
-              </select>
+
+              {/* Category selection dropdown */}
+              <div className="space-y-2">
+                <select
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      handleCategoryAdd(e.target.value);
+                      e.target.value = "";
+                    }
+                  }}
+                  className="w-full px-3 py-2 rounded-md border border-neutral-200 focus:ring-2 focus:ring-neutral-900/10 outline-none"
+                  disabled={categoriesLoading}
+                >
+                  <option value="">
+                    {categoriesLoading
+                      ? "Đang tải danh mục..."
+                      : "Chọn danh mục để thêm"}
+                  </option>
+                  {availableCategories.map((cat) => (
+                    <option
+                      key={cat.id}
+                      value={cat.name}
+                      disabled={formData.categories.includes(cat.name)}
+                    >
+                      {cat.name}{" "}
+                      {formData.categories.includes(cat.name)
+                        ? "(Đã thêm)"
+                        : ""}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Custom category input */}
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Hoặc nhập danh mục tùy chỉnh..."
+                    value={customCategoryInput}
+                    onChange={(e) => setCustomCategoryInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleCustomCategoryAdd();
+                      }
+                    }}
+                    className="flex-1 px-3 py-2 rounded-md border border-neutral-200 focus:ring-2 focus:ring-neutral-900/10 outline-none text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleCustomCategoryAdd}
+                    disabled={!customCategoryInput.trim()}
+                    className="px-3 py-2 text-sm bg-neutral-100 text-neutral-700 rounded-md hover:bg-neutral-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Thêm
+                  </button>
+                </div>
+
+                <p className="text-xs text-neutral-500">
+                  💡 Bạn có thể chọn từ danh sách có sẵn hoặc thêm danh mục tùy
+                  chỉnh
+                </p>
+              </div>
             </div>
 
+            {/* ... existing visibility checkboxes ... */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="flex items-center gap-2">
@@ -699,11 +840,10 @@ export default function ProductDetailPage() {
         </div>
 
         <div className="space-y-4">
-          {/* Hình ảnh sản phẩm */}
+          {/* Hình ảnh hiện tại */}
           <div className="rounded-xl border border-neutral-200 bg-white p-4 space-y-3">
-            <div className="text-sm font-medium">Hình ảnh sản phẩm</div>
+            <div className="text-sm font-medium">Hình ảnh hiện tại</div>
 
-            {/* Hình ảnh chính */}
             {formData.images && formData.images.length > 0 ? (
               <div className="space-y-3">
                 <div className="relative aspect-square overflow-hidden rounded-md border border-neutral-200 bg-neutral-50">
@@ -715,14 +855,13 @@ export default function ProductDetailPage() {
                   />
                   <button
                     type="button"
-                    onClick={() => handleImageRemove(activeImageIndex)}
+                    onClick={() => handleExistingImageRemove(activeImageIndex)}
                     className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
                   >
                     ×
                   </button>
                 </div>
 
-                {/* Thumbnail gallery */}
                 {formData.images.length > 1 && (
                   <div className="grid grid-cols-4 gap-2">
                     {formData.images.map((image, index) => (
@@ -754,21 +893,50 @@ export default function ProductDetailPage() {
             )}
           </div>
 
+          {/* Hình ảnh mới sẽ được thêm */}
+          {newImagePreviews.length > 0 && (
+            <div className="rounded-xl border border-neutral-200 bg-white p-4 space-y-3">
+              <div className="text-sm font-medium text-green-600">
+                Hình ảnh mới ({newImagePreviews.length})
+              </div>
+              <div className="grid grid-cols-4 gap-2">
+                {newImagePreviews.map((preview, index) => (
+                  <div
+                    key={index}
+                    className="relative aspect-square overflow-hidden rounded border border-green-200"
+                  >
+                    <Image
+                      alt={`New image ${index + 1}`}
+                      src={preview}
+                      fill
+                      className="object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleNewImageRemove(index)}
+                      className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs hover:bg-red-600"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Upload hình ảnh mới */}
           <div className="rounded-xl border border-neutral-200 bg-white p-4 space-y-3">
-            <div className="text-sm font-medium">Tải lên hình ảnh mới</div>
+            <div className="text-sm font-medium">Thêm hình ảnh mới</div>
             <div
               onClick={() => fileInputRef.current?.click()}
               className="rounded-md border border-dashed border-neutral-300 p-6 text-center text-sm text-neutral-500 cursor-pointer hover:border-neutral-400 hover:bg-neutral-50"
             >
               <div className="space-y-2">
-                <div>
-                  {uploading
-                    ? "Đang upload..."
-                    : "Kéo thả hoặc click để upload"}
-                </div>
+                <div>Kéo thả hoặc click để chọn hình ảnh</div>
                 <div className="text-xs">
                   Hỗ trợ: JPG, PNG, GIF (tối đa 5MB)
+                  <br />
+                  Hình ảnh sẽ được upload khi lưu sản phẩm
                 </div>
               </div>
             </div>
@@ -777,7 +945,7 @@ export default function ProductDetailPage() {
               type="file"
               multiple
               accept="image/*"
-              onChange={(e) => handleImageUpload(e.target.files)}
+              onChange={(e) => handleImageSelect(e.target.files)}
               className="hidden"
             />
           </div>
@@ -790,14 +958,27 @@ export default function ProductDetailPage() {
               className="inline-flex items-center justify-center rounded-md bg-neutral-900 text-white text-sm px-4 py-2 hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {updating ? "Đang lưu..." : "Lưu thay đổi"}
+              {newImageFiles.length > 0 && (
+                <span className="ml-1 text-xs bg-neutral-700 px-1 rounded">
+                  +{newImageFiles.length} ảnh
+                </span>
+              )}
             </button>
+
             <button
               type="button"
-              onClick={() => window.location.reload()}
+              onClick={() => {
+                // Clear new images và reload
+                setNewImageFiles([]);
+                newImagePreviews.forEach((url) => URL.revokeObjectURL(url));
+                setNewImagePreviews([]);
+                window.location.reload();
+              }}
               className="inline-flex items-center justify-center rounded-md border border-neutral-200 text-neutral-700 text-sm px-4 py-2 hover:bg-neutral-50"
             >
               Hủy thay đổi
             </button>
+
             <Link
               href="/admin/products"
               className="inline-flex items-center justify-center text-sm text-neutral-700 hover:text-neutral-900"

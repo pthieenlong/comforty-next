@@ -8,6 +8,7 @@ import {
   HomeIcon,
   CubeIcon,
   ShoppingBagIcon,
+  TagIcon,
   ChevronDownIcon,
 } from "@heroicons/react/24/outline";
 
@@ -28,6 +29,14 @@ const navItems: NavItem[] = [
       { label: "Thêm sản phẩm", href: "/admin/products/new" },
     ],
   },
+  {
+    label: "Danh mục",
+    icon: TagIcon,
+    children: [
+      { label: "Xem tất cả", href: "/admin/categories" },
+      { label: "Thêm danh mục", href: "/admin/categories/new" },
+    ],
+  },
   { label: "Đơn hàng", href: "/admin/orders", icon: ShoppingBagIcon },
 ];
 
@@ -35,10 +44,12 @@ export default function Sidebar() {
   const pathname = usePathname();
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
 
-  // Open products group if current path matches
   useEffect(() => {
     if (pathname.startsWith("/admin/products")) {
       setOpenGroups((prev) => ({ ...prev, products: true }));
+    }
+    if (pathname.startsWith("/admin/categories")) {
+      setOpenGroups((prev) => ({ ...prev, categories: true }));
     }
   }, [pathname]);
 
@@ -63,7 +74,8 @@ export default function Sidebar() {
         <ul className="space-y-1">
           {navItems.map((item) => {
             if (item.children) {
-              const groupKey = "products"; // only one group for now
+              const groupKey =
+                item.label === "Sản phẩm" ? "products" : "categories";
               const open = openGroups[groupKey] ?? false;
               const anyChildActive = item.children.some((c) =>
                 isActive(c.href)
