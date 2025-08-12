@@ -177,35 +177,39 @@ export const useCheckout = () => {
 
     try {
       const orderData: CreateOrderRequest = {
+        firstName: shippingInfo.firstName,
+        lastName: shippingInfo.lastName,
+        address: `${shippingInfo.address}, ${shippingInfo.ward}, ${shippingInfo.district}, ${shippingInfo.city}`,
+        phone: shippingInfo.phone,
+        email: shippingInfo.email,
         items: items.map((item) => ({
+          id: item.slug,
           slug: item.slug,
-          quantity: item.quantity,
+          title: item.title,
+          categories: [],
           price: item.price,
+          quantity: item.quantity,
+          image: item.image,
+          isSale: item.originalPrice ? item.originalPrice > item.price : false,
+          salePercent: item.originalPrice
+            ? Math.round(
+                ((item.originalPrice - item.price) / item.originalPrice) * 100
+              )
+            : 0,
+          inStock: item.inStock,
         })),
-        shipping: shippingInfo,
-        payment: {
-          method: paymentInfo.method,
-          ...(paymentInfo.method === "card" && {
-            cardNumber: paymentInfo.cardNumber,
-            expiryDate: paymentInfo.expiryDate,
-            cvv: paymentInfo.cvv,
-            cardName: paymentInfo.cardName,
-          }),
-        },
-        totals: {
-          subtotal,
-          shipping,
-          tax,
-          total,
-        },
-        userId: user.UID,
+        total,
+        subtotal,
+        discount: 0,
+        shippingFee: shipping,
+        username: user.username,
       };
 
       const response = await orderService.createOrder(orderData);
 
       if (response.success && response.data) {
         clearAllItems();
-        return { success: true, orderId: response.data.orderId };
+        return { success: true, orderId: response.data._id };
       } else {
         throw new Error(response.message || "Failed to create order");
       }

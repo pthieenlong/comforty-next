@@ -11,6 +11,8 @@ import {
 } from "@heroicons/react/24/outline";
 import { useCart } from "@/common/hooks/useCart";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
+import { orderService } from "@/services/orderService";
 
 interface ShippingInfo {
   firstName: string;
@@ -36,6 +38,7 @@ interface PaymentInfo {
 export default function CheckoutPage() {
   const router = useRouter();
   const { items, subtotal, total, isEmpty, clearAllItems } = useCart();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
@@ -124,16 +127,61 @@ export default function CheckoutPage() {
 
     setProcessing(true);
     try {
-      // TODO: Submit order to API
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      // Prepare order data
+      const orderData = {
+        firstName: shippingInfo.firstName,
+        lastName: shippingInfo.lastName,
+        address: `${shippingInfo.address}, ${shippingInfo.ward}, ${shippingInfo.district}, ${shippingInfo.city}`,
+        phone: shippingInfo.phone,
+        email: shippingInfo.email,
+        items: items.map((item) => ({
+          id: item.slug,
+          slug: item.slug,
+          title: item.title,
+          categories: [], // Will be populated by backend
+          price: item.price,
+          quantity: item.quantity,
+          image: item.image,
+          isSale: item.originalPrice ? item.originalPrice > item.price : false,
+          salePercent: item.originalPrice
+            ? Math.round(
+                ((item.originalPrice - item.price) / item.originalPrice) * 100
+              )
+            : 0,
+          inStock: item.inStock,
+        })),
+        total: finalTotal,
+        subtotal: subtotal,
+        discount: 0, // Calculate discount if needed
+        shippingFee: shipping,
+        username: user?.username, // Add username if user is logged in
+      };
 
-      // Clear cart after successful order
-      clearAllItems();
+      // Submit order to API using orderService
+      const response = await orderService.createOrder(orderData);
 
-      // Redirect to success page
-      router.push("/checkout/success");
-    } catch {
-      alert("Đặt hàng thất bại. Vui lòng thử lại.");
+      if (response.success) {
+        // Clear cart after successful order
+        await clearAllItems();
+
+        // Store order ID for success page
+        const orderId = response.data?._id;
+        if (orderId) {
+          localStorage.setItem("lastOrderId", orderId);
+        }
+
+        // Redirect to success page
+        router.push("/checkout/success");
+      } else {
+        throw new Error(response.message || "Đặt hàng thất bại");
+      }
+    } catch (error: any) {
+      console.error("Checkout error:", error);
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "Đặt hàng thất bại. Vui lòng thử lại.";
+      alert(errorMessage);
     } finally {
       setProcessing(false);
     }

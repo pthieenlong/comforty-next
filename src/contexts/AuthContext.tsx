@@ -10,14 +10,12 @@ import {
 import {
   authService,
   LoginRequest,
-  LoginResponse,
   RegisterRequest,
-  VerifyEmailRequest,
-  ResendVerificationRequest,
+  User,
 } from "@/services/authService";
 
 interface AuthState {
-  user: LoginResponse | null;
+  user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   error: string | null;
@@ -25,7 +23,7 @@ interface AuthState {
 
 type AuthAction =
   | { type: "LOGIN_START" }
-  | { type: "LOGIN_SUCCESS"; payload: LoginResponse }
+  | { type: "LOGIN_SUCCESS"; payload: User }
   | { type: "LOGIN_FAILURE"; payload: string }
   | { type: "REGISTER_START" }
   | { type: "REGISTER_SUCCESS" }
@@ -129,10 +127,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       dispatch({ type: "SET_LOADING", payload: true });
 
       try {
+        // Try to get user from localStorage first
         const userData = localStorage.getItem("user");
         if (userData) {
           const user = JSON.parse(userData);
-          dispatch({ type: "LOGIN_SUCCESS", payload: user });
+
+          // Verify token is still valid by trying to refresh
+          try {
+            const authResult = await authService.checkAuth();
+            if (authResult) {
+              dispatch({ type: "LOGIN_SUCCESS", payload: user });
+            } else {
+              // Token expired, clear localStorage
+              localStorage.removeItem("user");
+            }
+          } catch (error) {
+            // Token invalid, clear localStorage
+            localStorage.removeItem("user");
+          }
         }
       } catch (error) {
         console.error("Error checking auth status:", error);
@@ -189,7 +201,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "VERIFY_EMAIL_START" });
 
     try {
-      const response = await authService.verifyEmail({ token });
+      const response = await authService.verifyEmail(token);
 
       if (response.success) {
         dispatch({ type: "VERIFY_EMAIL_SUCCESS" });
@@ -210,7 +222,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "RESEND_VERIFICATION_START" });
 
     try {
-      const response = await authService.resendVerification({ email });
+      const response = await authService.resendVerification(email);
 
       if (response.success) {
         dispatch({ type: "RESEND_VERIFICATION_SUCCESS" });

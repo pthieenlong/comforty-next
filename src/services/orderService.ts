@@ -35,20 +35,45 @@ export interface OrderTotals {
 }
 
 export interface CreateOrderRequest {
-  items: OrderItem[];
-  shipping: ShippingInfo;
-  payment: PaymentInfo;
-  totals: OrderTotals;
-  userId: string;
+  firstName: string;
+  lastName: string;
+  address: string;
+  phone: string;
+  email: string;
+  items: Array<{
+    id: string;
+    slug: string;
+    title: string;
+    categories: string[];
+    price: number;
+    quantity: number;
+    image: string;
+    isSale: boolean;
+    salePercent: number;
+    inStock: boolean;
+  }>;
+  total: number;
+  subtotal?: number;
+  discount?: number;
+  shippingFee?: number;
+  username?: string;
 }
 
 export interface OrderResponse {
-  orderId: string;
+  _id: string;
+  orderId?: string;
   status: "pending" | "processing" | "shipped" | "delivered" | "cancelled";
   items: OrderItem[];
-  shipping: ShippingInfo;
-  payment: PaymentInfo;
-  totals: OrderTotals;
+  firstName?: string;
+  lastName?: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  total: number;
+  subtotal?: number;
+  discount?: number;
+  shippingFee?: number;
+  username?: string;
   createdAt: string;
   updatedAt: string;
   estimatedDelivery?: string;
@@ -71,69 +96,92 @@ export interface ApiResponse<T> {
 
 export const orderService = {
   // Create new order
-  async createOrder(orderData: CreateOrderRequest): Promise<ApiResponse<OrderResponse>> {
-    const response = await api.post('/orders', orderData);
+  async createOrder(
+    orderData: CreateOrderRequest
+  ): Promise<ApiResponse<OrderResponse>> {
+    const response = await api.post("/order/checkout", orderData);
     return response.data;
   },
 
   // Get order by ID
-  async getOrder(orderId: string): Promise<ApiResponse<OrderResponse>> {
-    const response = await api.get(`/orders/${orderId}`);
+  async getOrder(
+    orderId: string,
+    username: string
+  ): Promise<ApiResponse<OrderResponse>> {
+    const response = await api.get(`/order/${username}?id=${orderId}`);
     return response.data;
   },
 
   // Get user's order history
-  async getOrderHistory(page: number = 1, limit: number = 10): Promise<ApiResponse<OrderHistoryResponse>> {
-    const response = await api.get(`/orders/history?page=${page}&limit=${limit}`);
+  async getOrderHistory(
+    username: string,
+    page: number = 1,
+    limit: number = 10
+  ): Promise<ApiResponse<OrderHistoryResponse>> {
+    const response = await api.get(`/order/${username}?page=${page}`);
     return response.data;
   },
 
   // Cancel order
-  async cancelOrder(orderId: string, reason?: string): Promise<ApiResponse<{ message: string }>> {
+  async cancelOrder(
+    orderId: string,
+    reason?: string
+  ): Promise<ApiResponse<{ message: string }>> {
     const response = await api.post(`/orders/${orderId}/cancel`, { reason });
     return response.data;
   },
 
   // Track order
-  async trackOrder(orderId: string): Promise<ApiResponse<{
-    status: string;
-    trackingNumber?: string;
-    trackingUrl?: string;
-    updates: Array<{
+  async trackOrder(orderId: string): Promise<
+    ApiResponse<{
       status: string;
-      description: string;
-      timestamp: string;
-      location?: string;
-    }>;
-  }>> {
+      trackingNumber?: string;
+      trackingUrl?: string;
+      updates: Array<{
+        status: string;
+        description: string;
+        timestamp: string;
+        location?: string;
+      }>;
+    }>
+  > {
     const response = await api.get(`/orders/${orderId}/track`);
     return response.data;
   },
 
   // Get shipping methods
-  async getShippingMethods(): Promise<ApiResponse<Array<{
-    id: string;
-    name: string;
-    description: string;
-    price: number;
-    estimatedDays: string;
-  }>>> {
-    const response = await api.get('/orders/shipping-methods');
+  async getShippingMethods(): Promise<
+    ApiResponse<
+      Array<{
+        id: string;
+        name: string;
+        description: string;
+        price: number;
+        estimatedDays: string;
+      }>
+    >
+  > {
+    const response = await api.get("/orders/shipping-methods");
     return response.data;
   },
 
   // Calculate shipping cost
-  async calculateShipping(city: string, items: OrderItem[]): Promise<ApiResponse<{
-    cost: number;
-    estimatedDays: string;
-    availableMethods: Array<{
-      id: string;
-      name: string;
-      price: number;
+  async calculateShipping(
+    city: string,
+    items: OrderItem[]
+  ): Promise<
+    ApiResponse<{
+      cost: number;
       estimatedDays: string;
-    }>;
-  }>> {
-    const response = await api.post('/orders/calculate-shipping', {
+      availableMethods: Array<{
+        id: string;
+        name: string;
+        price: number;
+        estimatedDays: string;
+      }>;
+    }>
+  > {
+    const response = await api.post("/orders/calculate-shipping", {
       city,
       items,
     });
@@ -141,11 +189,13 @@ export const orderService = {
   },
 
   // Validate payment method
-  async validatePayment(paymentInfo: PaymentInfo): Promise<ApiResponse<{
-    isValid: boolean;
-    message?: string;
-  }>> {
-    const response = await api.post('/orders/validate-payment', paymentInfo);
+  async validatePayment(paymentInfo: PaymentInfo): Promise<
+    ApiResponse<{
+      isValid: boolean;
+      message?: string;
+    }>
+  > {
+    const response = await api.post("/orders/validate-payment", paymentInfo);
     return response.data;
   },
 };

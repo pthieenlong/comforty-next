@@ -19,10 +19,16 @@ export default function CheckoutSuccessPage() {
   const [orderId, setOrderId] = useState<string>("");
 
   useEffect(() => {
-    // Get order ID from URL params or generate one
+    // Get order ID from URL params or localStorage
     const urlOrderId = searchParams.get("orderId");
+    const storedOrderId = localStorage.getItem("lastOrderId");
+
     if (urlOrderId) {
       setOrderId(urlOrderId);
+    } else if (storedOrderId) {
+      setOrderId(storedOrderId);
+      // Clear stored order ID after use
+      localStorage.removeItem("lastOrderId");
     } else {
       // Generate a mock order ID for demo
       setOrderId(`ORD-${Date.now().toString().slice(-8)}`);
