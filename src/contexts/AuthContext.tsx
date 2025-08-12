@@ -121,28 +121,23 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
-  // Kiểm tra auth status khi app load
   useEffect(() => {
     const checkAuthStatus = async () => {
       dispatch({ type: "SET_LOADING", payload: true });
 
       try {
-        // Try to get user from localStorage first
         const userData = localStorage.getItem("user");
         if (userData) {
           const user = JSON.parse(userData);
 
-          // Verify token is still valid by trying to refresh
           try {
             const authResult = await authService.checkAuth();
             if (authResult) {
               dispatch({ type: "LOGIN_SUCCESS", payload: user });
             } else {
-              // Token expired, clear localStorage
               localStorage.removeItem("user");
             }
           } catch (error) {
-            // Token invalid, clear localStorage
             localStorage.removeItem("user");
           }
         }

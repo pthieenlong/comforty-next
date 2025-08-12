@@ -134,7 +134,7 @@ export default function AccountOrdersPage() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-6xl mx-auto">
-        {/* Breadcrumb */}
+
         <div className="mb-6">
           <Link
             href="/account"
@@ -145,7 +145,7 @@ export default function AccountOrdersPage() {
           </Link>
         </div>
 
-        {/* Header */}
+
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <div className="flex items-center justify-between">
             <div>
@@ -165,7 +165,7 @@ export default function AccountOrdersPage() {
           </div>
         </div>
 
-        {/* Error State */}
+
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
             <div className="flex">
@@ -177,7 +177,7 @@ export default function AccountOrdersPage() {
           </div>
         )}
 
-        {/* Loading State */}
+
         {loading && orders.length === 0 && (
           <div className="bg-white rounded-lg shadow-sm p-12 text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
@@ -185,7 +185,7 @@ export default function AccountOrdersPage() {
           </div>
         )}
 
-        {/* Empty State */}
+
         {!loading && orders.length === 0 && !error && (
           <div className="bg-white rounded-lg shadow-sm p-12 text-center">
             <CalendarDaysIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
@@ -204,7 +204,7 @@ export default function AccountOrdersPage() {
           </div>
         )}
 
-        {/* Orders List */}
+
         {orders.length > 0 && (
           <div className="space-y-4">
             {orders.map((order) => {
@@ -262,7 +262,7 @@ export default function AccountOrdersPage() {
               );
             })}
 
-            {/* Load More Button */}
+
             {hasMore && (
               <div className="text-center pt-6">
                 <button

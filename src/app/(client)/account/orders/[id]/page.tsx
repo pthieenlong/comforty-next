@@ -155,7 +155,6 @@ export default function AccountOrderDetailPage() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-4xl mx-auto">
-        {/* Breadcrumb */}
         <div className="mb-6">
           <div className="flex items-center space-x-2 text-sm text-gray-600">
             <Link href="/account" className="hover:text-gray-900">
@@ -170,7 +169,6 @@ export default function AccountOrderDetailPage() {
           </div>
         </div>
 
-        {/* Header */}
         <div className="mb-6">
           <Link
             href="/account/orders"
@@ -207,7 +205,6 @@ export default function AccountOrderDetailPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Order Items */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">
@@ -274,9 +271,7 @@ export default function AccountOrderDetailPage() {
             </div>
           </div>
 
-          {/* Order Summary & Info */}
           <div className="space-y-6">
-            {/* Order Summary */}
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">
                 Tóm tắt đơn hàng
@@ -299,7 +294,6 @@ export default function AccountOrderDetailPage() {
               </div>
             </div>
 
-            {/* Shipping Information */}
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">
                 Thông tin giao hàng
@@ -344,7 +338,6 @@ export default function AccountOrderDetailPage() {
               </div>
             </div>
 
-            {/* Order Timeline */}
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">
                 Trạng thái đơn hàng
@@ -447,7 +440,6 @@ export default function AccountOrderDetailPage() {
               </div>
             </div>
 
-            {/* Order Actions */}
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">
                 Hành động

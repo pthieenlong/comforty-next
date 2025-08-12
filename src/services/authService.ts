@@ -49,7 +49,6 @@ export interface AuthResponse {
 }
 
 export const authService = {
-  // Login user
   async login(credentials: LoginRequest): Promise<AuthResponse> {
     try {
       const response = await api.post("/auth/login", credentials);
@@ -59,7 +58,6 @@ export const authService = {
     }
   },
 
-  // Register user
   async register(userData: RegisterRequest): Promise<AuthResponse> {
     try {
       const response = await api.post("/auth/register", userData);
@@ -69,11 +67,8 @@ export const authService = {
     }
   },
 
-  // Logout user (clear tokens)
   async logout(): Promise<void> {
     try {
-      // Since we don't have logout endpoint, we'll just clear cookies on client side
-      // The HTTP-only cookies will expire naturally or can be cleared by setting expired cookies
       document.cookie =
         "accessToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
       document.cookie =
@@ -83,7 +78,6 @@ export const authService = {
     }
   },
 
-  // Forgot password
   async forgotPassword(data: ForgotPasswordRequest): Promise<AuthResponse> {
     try {
       const response = await api.post("/auth/forgot-password", data);
@@ -93,7 +87,6 @@ export const authService = {
     }
   },
 
-  // Reset password
   async resetPassword(data: ResetPasswordRequest): Promise<AuthResponse> {
     try {
       const response = await api.post("/auth/reset-password", data);
@@ -105,7 +98,6 @@ export const authService = {
     }
   },
 
-  // Update password
   async updatePassword(
     username: string,
     data: UpdatePasswordRequest
@@ -123,7 +115,6 @@ export const authService = {
     }
   },
 
-  // Verify email
   async verifyEmail(token: string): Promise<AuthResponse> {
     try {
       const response = await api.post("/auth/verify-email", { token });
@@ -135,7 +126,6 @@ export const authService = {
     }
   },
 
-  // Resend verification email
   async resendVerification(email: string): Promise<AuthResponse> {
     try {
       const response = await api.post("/auth/resend-verification", { email });
@@ -147,7 +137,6 @@ export const authService = {
     }
   },
 
-  // Refresh access token
   async refreshToken(): Promise<AuthResponse> {
     try {
       const response = await api.post("/auth/token");
@@ -159,12 +148,10 @@ export const authService = {
     }
   },
 
-  // Check if user is authenticated (by trying to refresh token)
   async checkAuth(): Promise<User | null> {
     try {
       const response = await this.refreshToken();
       if (response.success) {
-        // Since refresh token doesn't return user data, we need to get it from localStorage
         const userData = localStorage.getItem("user");
         if (userData) {
           return JSON.parse(userData);

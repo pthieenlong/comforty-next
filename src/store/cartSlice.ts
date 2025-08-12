@@ -1,6 +1,6 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
-// Cart item interface
+
 export interface ICartItem {
   slug: string;
   title: string;
@@ -11,7 +11,7 @@ export interface ICartItem {
   inStock: boolean;
 }
 
-// Cart state interface
+
 export interface ICart {
   items: ICartItem[];
   totalItems: number;
@@ -20,7 +20,7 @@ export interface ICart {
   total: number;
 }
 
-// Initial state
+
 const initialState: ICart = {
   items: [],
   totalItems: 0,
@@ -168,7 +168,7 @@ const cartSlice = createSlice({
   },
 });
 
-// Export actions
+
 export const {
   addToCart,
   removeFromCart,
@@ -180,7 +180,7 @@ export const {
   loadCart,
 } = cartSlice.actions;
 
-// Selectors
+
 export const selectCart = (state: { cart: ICart }) => state.cart;
 export const selectCartItems = (state: { cart: ICart }) => state.cart.items;
 export const selectCartItemsCount = (state: { cart: ICart }) =>

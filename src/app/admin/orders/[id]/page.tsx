@@ -97,7 +97,7 @@ export default function AdminOrderDetailPage() {
   const loadOrderDetail = async () => {
     try {
       setLoading(true);
-      // Note: API endpoint might need to be adjusted based on actual backend implementation
+
       const response = await api.get<AdminOrderResponse>(
         `/order/admin/orders/${orderId}`
       );
@@ -205,7 +205,6 @@ export default function AdminOrderDetailPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
         <div className="mb-6">
           <Link
             href="/admin/orders"
@@ -271,7 +270,6 @@ export default function AdminOrderDetailPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Order Items */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">
@@ -340,9 +338,7 @@ export default function AdminOrderDetailPage() {
             </div>
           </div>
 
-          {/* Order Summary & Info */}
           <div className="space-y-6">
-            {/* Order Summary */}
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">
                 Tóm tắt đơn hàng
@@ -379,7 +375,6 @@ export default function AdminOrderDetailPage() {
               </div>
             </div>
 
-            {/* Customer Information */}
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">
                 Thông tin khách hàng
@@ -427,7 +422,6 @@ export default function AdminOrderDetailPage() {
               </div>
             </div>
 
-            {/* Order Actions */}
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">
                 Thao tác

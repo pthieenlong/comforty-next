@@ -7,32 +7,32 @@ export interface PasswordValidation {
 export function validatePassword(password: string): PasswordValidation {
   const errors: string[] = [];
 
-  // Kiểm tra độ dài
+  
   if (password.length < 8) {
     errors.push("Mật khẩu phải có ít nhất 8 ký tự");
   }
 
-  // Kiểm tra có chữ hoa
+  
   if (!/[A-Z]/.test(password)) {
     errors.push("Mật khẩu phải có ít nhất 1 chữ cái viết hoa");
   }
 
-  // Kiểm tra có chữ thường
+  
   if (!/[a-z]/.test(password)) {
     errors.push("Mật khẩu phải có ít nhất 1 chữ cái viết thường");
   }
 
-  // Kiểm tra có số
+  
   if (!/\d/.test(password)) {
     errors.push("Mật khẩu phải có ít nhất 1 số");
   }
 
-  // Kiểm tra có ký tự đặc biệt
+  
   if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
     errors.push("Mật khẩu phải có ít nhất 1 ký tự đặc biệt");
   }
 
-  // Tính độ mạnh
+  
   let strength: "weak" | "medium" | "strong" = "weak";
   if (errors.length === 0) {
     if (

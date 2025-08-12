@@ -33,10 +33,10 @@ export default function EmailVerificationBanner({
       setShowSuccess(true);
       setResendCooldown(60);
 
-      // Hide success message after 3 seconds
+      
       setTimeout(() => setShowSuccess(false), 3000);
 
-      // Countdown timer
+      
       const interval = setInterval(() => {
         setResendCooldown((prev) => {
           if (prev <= 1) {

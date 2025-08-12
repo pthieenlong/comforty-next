@@ -1,6 +1,5 @@
 import { ICartItem } from "@/store/cartSlice";
 
-// Backend cart item interface (matching API)
 export interface IBackendCartItem {
   id: string;
   slug: string;
@@ -14,7 +13,6 @@ export interface IBackendCartItem {
   inStock: boolean;
 }
 
-// Convert frontend cart item to backend format
 export const convertToBackendItem = (item: ICartItem): IBackendCartItem => {
   return {
     id: item.slug, // Use slug as id for now
@@ -34,7 +32,6 @@ export const convertToBackendItem = (item: ICartItem): IBackendCartItem => {
   };
 };
 
-// Convert backend cart item to frontend format
 export const convertToFrontendItem = (item: IBackendCartItem): ICartItem => {
   return {
     slug: item.slug,
@@ -49,7 +46,6 @@ export const convertToFrontendItem = (item: IBackendCartItem): ICartItem => {
   };
 };
 
-// Calculate cart totals
 export const calculateCartTotals = (items: ICartItem[]) => {
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
   const subtotal = items.reduce(
@@ -69,7 +65,6 @@ export const calculateCartTotals = (items: ICartItem[]) => {
   return { totalItems, subtotal, discount, total };
 };
 
-// Format currency for Vietnam
 export const formatCurrency = (amount: number): string => {
   return new Intl.NumberFormat("vi-VN", {
     style: "currency",
@@ -77,7 +72,6 @@ export const formatCurrency = (amount: number): string => {
   }).format(amount);
 };
 
-// Validate cart item
 export const isValidCartItem = (item: any): item is ICartItem => {
   return (
     item &&
@@ -90,36 +84,29 @@ export const isValidCartItem = (item: any): item is ICartItem => {
   );
 };
 
-// Clean cart items from localStorage
 export const cleanCartItems = (items: any[]): ICartItem[] => {
   return items.filter(isValidCartItem);
 };
 
-// Merge local cart items with backend cart items
-// Priority: local items take precedence for quantity if item exists in both
 export const mergeCartItems = (
   localItems: ICartItem[],
   backendItems: IBackendCartItem[]
 ): ICartItem[] => {
   const merged = new Map<string, ICartItem>();
 
-  // Add backend items first (converted to frontend format)
   backendItems.forEach((backendItem) => {
     const frontendItem = convertToFrontendItem(backendItem);
     merged.set(frontendItem.slug, frontendItem);
   });
 
-  // Add/update with local items (local takes priority for quantity)
   localItems.forEach((localItem) => {
     const existingItem = merged.get(localItem.slug);
     if (existingItem) {
-      // Item exists in both - use local quantity but keep backend data for other fields
       merged.set(localItem.slug, {
         ...existingItem,
         quantity: localItem.quantity + existingItem.quantity, // Add quantities together
       });
     } else {
-      // Item only exists locally
       merged.set(localItem.slug, localItem);
     }
   });

@@ -27,7 +27,6 @@ export default function ForgotPasswordPage() {
     setError("");
 
     try {
-      // TODO: Implement actual password reset
       await new Promise((resolve) => setTimeout(resolve, 1000));
       setSent(true);
     } catch (err: unknown) {
@@ -170,7 +169,6 @@ export default function ForgotPasswordPage() {
             </p>
           </div>
 
-          {/* Security Notice */}
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
             <div className="text-sm text-yellow-800">
               <p className="font-medium mb-1">🔒 Thông báo bảo mật</p>

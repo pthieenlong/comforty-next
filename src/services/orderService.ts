@@ -103,7 +103,6 @@ export interface ApiResponse<T> {
 }
 
 export const orderService = {
-  // Create new order
   async createOrder(
     orderData: CreateOrderRequest
   ): Promise<ApiResponse<OrderResponse>> {
@@ -111,7 +110,6 @@ export const orderService = {
     return response.data;
   },
 
-  // Get order by ID
   async getOrder(
     orderId: string,
     username: string
@@ -120,7 +118,6 @@ export const orderService = {
     return response.data;
   },
 
-  // Get user's order history
   async getOrderHistory(
     username: string,
     page: number = 1,
@@ -130,7 +127,6 @@ export const orderService = {
     return response.data;
   },
 
-  // Cancel order
   async cancelOrder(
     orderId: string,
     reason?: string
@@ -139,7 +135,6 @@ export const orderService = {
     return response.data;
   },
 
-  // Track order
   async trackOrder(orderId: string): Promise<
     ApiResponse<{
       status: string;
@@ -157,7 +152,6 @@ export const orderService = {
     return response.data;
   },
 
-  // Get shipping methods
   async getShippingMethods(): Promise<
     ApiResponse<
       Array<{
@@ -173,7 +167,6 @@ export const orderService = {
     return response.data;
   },
 
-  // Calculate shipping cost
   async calculateShipping(
     city: string,
     items: OrderItem[]
@@ -196,7 +189,6 @@ export const orderService = {
     return response.data;
   },
 
-  // Validate payment method
   async validatePayment(paymentInfo: PaymentInfo): Promise<
     ApiResponse<{
       isValid: boolean;

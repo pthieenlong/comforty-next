@@ -111,14 +111,12 @@ export default function ProductDetailPage() {
   }, [productSlug]);
 
   const handleAddToCart = () => {
-    // TODO: Implement add to cart
     console.log("Add to cart:", { productId: product?._id, quantity });
     alert(`Added ${quantity} item(s) to cart!`);
   };
 
   const handleAddToWishlist = () => {
     setIsWishlisted(!isWishlisted);
-    // TODO: Implement wishlist API
     console.log("Toggle wishlist:", product?._id);
   };
 

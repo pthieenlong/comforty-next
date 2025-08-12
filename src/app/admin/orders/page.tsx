@@ -250,7 +250,6 @@ export default function OrdersPage() {
           </table>
         </div>
 
-        {/* Pagination */}
         {totalPages > 1 && (
           <div className="px-4 py-3 border-t border-neutral-200 flex items-center justify-between">
             <div className="text-sm text-gray-600">

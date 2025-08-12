@@ -81,7 +81,6 @@ export default function WishlistPage() {
   };
 
   const addToCart = (id: string) => {
-    // TODO: Implement add to cart
     console.log("Add to cart:", id);
     alert("Added to cart!");
   };
@@ -92,7 +91,6 @@ export default function WishlistPage() {
       alert("No items in stock to add to cart");
       return;
     }
-    // TODO: Implement move all to cart
     console.log("Move all to cart:", inStockItems);
     alert(`Added ${inStockItems.length} items to cart!`);
   };
@@ -204,7 +202,6 @@ export default function WishlistPage() {
                   <button
                     onClick={(e) => {
                       e.preventDefault();
-                      // TODO: Open quick view modal
                       console.log("Quick view:", item.id);
                     }}
                     className="p-2 bg-white rounded-full shadow-md hover:bg-gray-50 transition-colors"

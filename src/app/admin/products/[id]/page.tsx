@@ -39,7 +39,6 @@ export default function ProductDetailPage() {
   const [product, setProduct] = useState<IProductResponse | null>(null);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
 
-  // Available categories từ database
   const [availableCategories, setAvailableCategories] = useState<ICategory[]>(
     []
   );
@@ -59,7 +58,6 @@ export default function ProductDetailPage() {
   const [newImageFiles, setNewImageFiles] = useState<File[]>([]);
   const [newImagePreviews, setNewImagePreviews] = useState<string[]>([]);
 
-  // Fetch available categories
   useEffect(() => {
     const fetchCategories = async () => {
       try {
@@ -67,7 +65,6 @@ export default function ProductDetailPage() {
         const response = await categoryService.getAllCategories();
 
         if (response.success && response.data) {
-          // Chỉ lấy categories visible
           const visibleCategories = response.data.filter(
             (cat) => cat.isVisible
           );
@@ -160,11 +157,9 @@ export default function ProductDetailPage() {
     }
   };
 
-  // Improved category add with validation
   const handleCategoryAdd = (categoryName: string) => {
     if (!categoryName) return;
 
-    // Check if category exists and is visible
     const categoryExists = availableCategories.find(
       (cat) => cat.name === categoryName
     );
@@ -173,7 +168,6 @@ export default function ProductDetailPage() {
       return;
     }
 
-    // Check if already added
     if (formData.categories.includes(categoryName)) {
       alert("Danh mục đã được thêm");
       return;
@@ -192,21 +186,18 @@ export default function ProductDetailPage() {
     }));
   };
 
-  // Custom category input (for adding categories not in the list)
   const [customCategoryInput, setCustomCategoryInput] = useState("");
 
   const handleCustomCategoryAdd = () => {
     const trimmedCategory = customCategoryInput.trim();
     if (!trimmedCategory) return;
 
-    // Check if already exists
     if (formData.categories.includes(trimmedCategory)) {
       alert("Danh mục đã được thêm");
       setCustomCategoryInput("");
       return;
     }
 
-    // Add custom category
     setFormData((prev) => ({
       ...prev,
       categories: [...prev.categories, trimmedCategory],
@@ -500,7 +491,6 @@ export default function ProductDetailPage() {
         </div>
       </div>
 
-      {/* Thông tin tổng quan */}
       <div className="rounded-xl border border-neutral-200 bg-white p-4">
         <h2 className="text-lg font-medium mb-4">Thông tin tổng quan</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
@@ -565,7 +555,6 @@ export default function ProductDetailPage() {
           </div>
         </div>
 
-        {/* Quick Actions */}
         <div className="flex gap-2 mt-4">
           <button
             type="button"
@@ -597,7 +586,6 @@ export default function ProductDetailPage() {
         className="grid grid-cols-1 lg:grid-cols-3 gap-6"
       >
         <div className="lg:col-span-2 space-y-4">
-          {/* Thông tin cơ bản */}
           <div className="rounded-xl border border-neutral-200 bg-white p-4 space-y-4">
             <h3 className="text-lg font-medium">Thông tin cơ bản</h3>
 
@@ -657,7 +645,6 @@ export default function ProductDetailPage() {
               </div>
             )}
 
-            {/* IMPROVED CATEGORY SECTION */}
             <div>
               <label className="block text-sm text-neutral-600 mb-1">
                 Danh mục
@@ -668,10 +655,8 @@ export default function ProductDetailPage() {
                 )}
               </label>
 
-              {/* Current categories display */}
               <div className="flex flex-wrap gap-2 mb-3">
                 {formData.categories.map((cat, index) => {
-                  // Check if this category exists in available categories
                   const isValidCategory = availableCategories.some(
                     (availCat) => availCat.name === cat
                   );
@@ -708,7 +693,6 @@ export default function ProductDetailPage() {
                 })}
               </div>
 
-              {/* Category selection dropdown */}
               <div className="space-y-2">
                 <select
                   onChange={(e) => {
@@ -739,7 +723,6 @@ export default function ProductDetailPage() {
                   ))}
                 </select>
 
-                {/* Custom category input */}
                 <div className="flex gap-2">
                   <input
                     type="text"
@@ -771,7 +754,6 @@ export default function ProductDetailPage() {
               </div>
             </div>
 
-            {/* ... existing visibility checkboxes ... */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="flex items-center gap-2">
@@ -804,7 +786,6 @@ export default function ProductDetailPage() {
             </div>
           </div>
 
-          {/* Mô tả sản phẩm */}
           <div className="rounded-xl border border-neutral-200 bg-white p-4 space-y-4">
             <h3 className="text-lg font-medium">Mô tả sản phẩm</h3>
 
@@ -840,7 +821,6 @@ export default function ProductDetailPage() {
         </div>
 
         <div className="space-y-4">
-          {/* Hình ảnh hiện tại */}
           <div className="rounded-xl border border-neutral-200 bg-white p-4 space-y-3">
             <div className="text-sm font-medium">Hình ảnh hiện tại</div>
 
@@ -893,7 +873,6 @@ export default function ProductDetailPage() {
             )}
           </div>
 
-          {/* Hình ảnh mới sẽ được thêm */}
           {newImagePreviews.length > 0 && (
             <div className="rounded-xl border border-neutral-200 bg-white p-4 space-y-3">
               <div className="text-sm font-medium text-green-600">
@@ -924,7 +903,6 @@ export default function ProductDetailPage() {
             </div>
           )}
 
-          {/* Upload hình ảnh mới */}
           <div className="rounded-xl border border-neutral-200 bg-white p-4 space-y-3">
             <div className="text-sm font-medium">Thêm hình ảnh mới</div>
             <div
@@ -950,7 +928,6 @@ export default function ProductDetailPage() {
             />
           </div>
 
-          {/* Actions */}
           <div className="flex flex-col gap-3">
             <button
               type="submit"
@@ -968,7 +945,6 @@ export default function ProductDetailPage() {
             <button
               type="button"
               onClick={() => {
-                // Clear new images và reload
                 setNewImageFiles([]);
                 newImagePreviews.forEach((url) => URL.revokeObjectURL(url));
                 setNewImagePreviews([]);
